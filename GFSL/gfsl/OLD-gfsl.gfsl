@@ -1,0 +1,614 @@
+// TODO: type cheking before further development.
+#include "std/std.gfsl"
+// debug porpuse
+#define stack as
+  "stack: " puts
+  print
+  "\n"	    puts
+end
+#define fixme as
+  // @usage: here fixme
+  eputs ": Compiler note, FIXME\n" eputs
+  1 exit
+end
+
+#define usage as 
+  // @usage: FILEstream usage
+  dup "Usage: %s [OPTIONS] input-file-path\n"	    rot fputs
+  dup "OPTIONS:\n"				    rot fputs
+  dup "    -h          print this help in stdout\n" rot fputs
+  dup "    -o  <path>  provide output path\n"	    rot fputs
+  dup "    sim <file>  simulate the program\n"	    rot fputs
+  dup "    com <file>  compile the program\n"	    rot fputs
+  drop
+end
+#define puts-loc as 
+  loc loc.line	64-> putd
+  ":" puts
+  loc loc.col	64-> putd
+  ":" puts
+  
+end
+// CONSTANTS -----------------------------
+#define BUFFER_MEMORY_CAPACITY	  as 69000	      end
+
+// #define SIMULATION_STACK_CAPACITY  as 1024 	      end
+#define SIMULATION_STACK_CAPACITY  as 1024 10 * end
+static goffi-mode		  sizeof(size_t)      end
+static com-label-count		  sizeof(size_t)      end
+static sim-stack-count		  sizeof(size_t)      end
+static sim-stack		  sizeof(size_t)      end
+static fd			  sizeof(size_t)      end
+static statbuffer		  sizeof(size_t)      end
+static int-iterator		  sizeof(size_t)      end
+static input-file-path		  sizeof(size_t)      end 
+static output-file-path		  sizeof(str)	      end
+static file-content		  sizeof(stat)	      end
+static line-file-content	  sizeof(str)         end
+static word-line-content	  sizeof(str)         end
+static string.a			  sizeof(str)         end
+static string.b			  sizeof(str)         end
+
+#define sizeof(loc)		  as 16		      end // size_t * 2
+static loc			  sizeof(loc)	      end
+#define loc.line			  as 0		    + end
+#define loc.col			  as sizeof(size_t) + end
+
+// set int-iterator to choose witch mode you want to perfome
+// MACROS 
+#define SIMULATION_MODE	as 1 end
+#define COMPILATION_MODE as 2 end
+#define LEX_MODE		as 3 end
+// OPERATIONS START ----------------------
+// @STATUS: NOT IMPLEMENTED YET  -- O MEM
+// @STATUS: NOT IMPLEMENTED YET P STR
+// @STATUS: NOT IMPLEMENTED YET OP_IDIVMOD
+// @STATUS: NOT IMPLEMENTED YET ARGC
+// @STATUS: NOT IMPLEMENTED YET ARGV
+// @STATUS: NOT IMPLEMENTED YET DUMP
+// @STATUS: NOT IMPLEMENTED YET DUMP
+// @STATUS: NOT IMPLEMENTED YET DROP
+// @STATUS: NOT IMPLEMENTED YET OVER
+// @STATUS: NOT IMPLEMENTED YET SWAP
+// @STATUS: NOT IMPLEMENTED YET ROT
+// @STATUS: NOT IMPLEMENTED YET P PTR
+// @STATUS: NOT IMPLEMENTED YET SHIFT LEFT
+// @STATUS: NOT IMPLEMENTED YET SHIFT RIGHT
+// @STATUS: NOT IMPLEMENTED YET OR
+// @STATUS: NOT IMPLEMENTED YET AND
+// @STATUS: NOT IMPLEMENTED YET NOT
+// @STATUS: NOT IMPLEMENTED YET O IF
+// @STATUS: NOT IMPLEMENTED YET O ELSE
+// @STATUS: NOT IMPLEMENTED YET O WHILE
+// @STATUS: NOT IMPLEMENTED YET O DO
+// @STATUS: NOT IMPLEMENTED YET O END
+// @STATUS: NOT IMPLEMENTED YET O SYSCALL
+// @STATUS: NOT IMPLEMENTED YET OP_INTRISIC_DIVMOD
+// @STATUS: NOT IMPLEMENTED YET O LOADBYTE  8 - 64
+// @STATUS: NOT IMPLEMENTED YET O STOREBYTE 8 - 64
+// @STATUS: NOT IMPLEMENTED YET O DIVMOD     
+
+// TODO:
+//    enums and struct will be cool 
+#define OP_INTRISIC_PLUS	      as 0 end
+#define OP_INTRISIC_MINUS      as 1 end
+#define OP_INTRISIC_EQUALS     as 2 end 
+#define OP_INTRISIC_MULT       as 3 end  
+#define OP_INTRISIC_GTHAN      as 4 end
+#define OP_INTRISIC_LTHAN      as 5 end
+#define OP_INTRISIC_NOT_EQUALS as 6 end 
+#define OP_PUSH_INT	      as 7 end
+
+#define OP_DUMP		      as 8  end
+#define OP_DUP		      as 9  end
+#define OP_DROP		      as 10 end
+#define OP_OVER		      as 11 end
+#define OP_ROT		      as 12 end
+
+#define OP_IF		      as 13 end  
+#define OP_ELSE  	      as 14 end 
+#define OP_WHILE 	      as 15 end  
+#define OP_DO		      as 16 end
+#define OP_END		      as 17 end
+#define NUM_OF_OPS	      as 18 end
+// OPERATIONS END ------------------------
+#define sizeof(op)	as 48			      end
+static ops-count	SIMULATION_STACK_CAPACITY 8 * end
+static ops		32 end	
+// u64-ops-8
+#define ops.op		as 8  +	end
+#define ops.type		as 16 + end
+#define ops.linked_to	as 24 + end
+#define ops.loc		as 32 +	end
+#define ops.head		as ops-count 64-> sizeof(op) * ops + end
+
+
+#define push-op as
+  // _ _ 
+  // type=op.head.type
+  // op=op.head.op
+  ops.head ops.op   <-64
+  ops.head ops.type <-64
+
+  ops-count inc64
+end
+// CROSS-REFERENCE SECTION --------------------------------
+static iter sizeof(size_t) end
+iter 0 64<- 
+#define cross-reference as
+
+  0 while dup ops-count 64-> < do
+    dup sizeof(op) * ops + 
+    dup ops.type 64-> dump
+    // THIS MUST PUSH THE CURRENT INSTRUCTION TO THE VECTOR
+    if dup ops.type 64-> OP_IF = do
+      "PUSHING IF\n" puts
+    else if dup ops.type 64-> OP_ELSE = do
+      "PUSHING ELSE\n" puts
+    else if dup ops.type 64-> OP_DO = do
+      "PUSHING DO\n" puts
+    else if dup ops.type 64-> OP_WHILE = do
+      "PUSHING WHILE\n" puts
+    end end end end 
+    // ----------------------------------------------------
+    if dup ops.type 64-> OP_END = do
+      // TODO: 
+      // POP BACK THE VECTOR and see the last element
+      // then compare to the src code 
+      "PUSHING END\n" puts
+    end
+    drop
+    1 + 
+  end
+end
+// LEX FILE SECTION ---------------------------------------
+#define lex-file as 
+  // OPEN THE FILE
+  // stack: ptr thats is the file-namme
+  420 
+  O_READONLY
+  input-file-path 64-> nth_argv 
+  AT_FDCWD
+  openat
+
+  if dup  0 < do
+    stderr usage 
+    "ERROR: could not open the file `"	eputs
+    input-file-path 64-> nth_argv g-str eputs
+    "`\n"				eputs
+    1 exit
+  end 
+  fd swap 64<-
+  if statbuffer fd 64-> fstat 0 < do
+    "ERROR: could not mesure the file size\n" eputs
+    1 exit
+  end
+
+  statbuffer stat.st_size     64-> 
+  file-content str.count swap 64<-
+  0 fd 64-> 
+  MAP_PRIVATE
+  PROT_READ
+  file-content str.count 64-> 
+  null 
+  mmap
+  file-content str.data swap 64<-
+
+
+  if file-content 64-> 0 < do
+    stderr usage
+    "ERROR: Could not memory map the file in lexing-stage\n" puts
+    1 exit
+  end 
+  //// At this point the file is open and is inside file-content
+  loc loc.line  0 64<-
+  loc loc.col   0 64<-
+  while file-content str.count cast(ptr) 64-> 0 > do
+    line-file-content cast(ptr) 
+    file-content cast(ptr) chop-line 
+    loc loc.line  inc64  
+
+  //  while line-file-content str.count 64-> 0 > do 
+  //      		line-file-content trim-left
+  //    word-line-content line-file-content chop-word
+
+  //    // ptr val
+  //    loc loc.col
+  //    word-line-content str.count-> // word-line-content->count
+  //    inc64-by // loc.loc += word-line-content->count
+  //    word-line-content
+  //    if dup str-> "+" streq do 
+  //      OP_INTRISIC_PLUS 0  push-op
+
+  //    else if dup str-> "-" streq do
+  //      OP_INTRISIC_MINUS 0 push-op
+
+  //    else if dup str-> "=" streq do 
+  //      OP_INTRISIC_EQUALS 0 push-op
+
+  //    else if dup str-> "*" streq do 
+  //      OP_INTRISIC_MULT  0 push-op
+
+  //    else if dup str-> "<" streq do 
+  //      OP_INTRISIC_LTHAN 0 push-op
+
+  //    else if dup str-> ">" streq do 
+  //      OP_INTRISIC_GTHAN 0 push-op
+
+
+  //    else if dup str-> "=" streq do 
+  //      OP_INTRISIC_EQUALS 0 push-op
+
+  //    else if dup str-> "!=" streq do 
+  //      OP_INTRISIC_NOT_EQUALS 0 push-op
+
+  //    else if dup str-> "dump" streq do
+  //      OP_DUMP	0 push-op
+
+  //    else if dup str-> "dup" streq do
+  //      OP_DUP  0 push-op
+
+  //    else if dup str-> "drop" streq do
+  //      OP_DROP 0 push-op
+
+  //    else if dup str-> "over" streq do
+  //      OP_OVER 0 push-op
+
+  //    else if dup str-> "rot" streq do
+  //      OP_ROT 0 push-op
+
+
+
+  //    else if dup str-> "if" streq do
+  //      OP_IF 0 push-op
+  //    else if dup str-> "else" streq do
+  //      OP_ELSE 0 push-op
+  //    else if dup str-> "while" streq do
+  //      OP_WHILE 0 push-op
+  //    else if dup str-> "do" streq do
+  //      OP_DO 0 push-op
+  //    else if dup str-> "end" streq do
+  //      OP_END 0 push-op
+
+  //    else if dup str-> swap drop 8-> is-digit do // this will read the char a ascii
+
+  //      OP_PUSH_INT 
+  //      10
+  //      //word-line-content 
+  //      //try-lex-int 
+  //      push-op
+
+  //    else
+  //      loc loc.line		    64->    putd
+  //      ":"				    eputs
+  //      loc loc.col		    64-> 
+  //      word-line-content str.count 64-> -  // loc->col - word->count 
+  //      				    putd
+  //      ": ERROR: Unreachable keyword	`"  eputs 
+  //      word-line-content str->		    eputs 
+  //      "` at lexing stage\n"	    	    eputs
+  //      1 exit
+
+  //    end end end end end end end end end end end end end end end end end end end
+  //  end
+    //loc loc.col 0 64<-
+  end
+end 
+#define try-lex-int  as // n1 s1 -> ret
+  // pre-stack: op ptr->count ptr->data 
+  // note: ptr is a pointer to a string
+  // _ 
+  //str.a.count = ptr->count
+  // str.a.data = ptr->data
+  string.a  str.data   
+  over	    str.data  64-> 64<-
+  string.a  str.count  
+  swap	    str.count 64-> 64<-
+  // string.a->count = ptr->count
+  // string.a->data  = ptr->data
+  //  after-stack: op
+  string.a str.count 64-> 
+  string.a str.data 64->
+  0 0 while dup string.a str.count-> < do
+    dup string.a str.data-> + 8-> ascii_0 - 
+    rot  10 * +
+    swap 
+    1 +
+  end drop 
+end
+// SIMULATION SECTION -------------------------------------
+#define sim-stack-push as 
+  if sim-stack-count 64-> SIMULATION_STACK_CAPACITY >= do 
+    here eputs ": ERROR: data stack overflow in simulation mode\n" eputs
+    1 exit
+  end
+  //
+  sim-stack sim-stack-count 64-> 8 * + swap 64<-
+  sim-stack-count inc64
+end
+#define sim-stack-pop as 
+  if sim-stack-count 64-> 0 = do
+    here eputs ": ERROR: data stack underflow in simulation mode\n" eputs
+    1 exit
+  end
+  sim-stack-count dec64
+  sim-stack sim-stack-count 64-> 8 * + 64->
+end
+#define simulate-ops as
+  if NUM_OF_OPS 13 != do
+    here						  puts 
+    ": Exhaustive handling operations in simulate-mode\n" puts
+    1 exit
+  end
+  0 while dup ops-count 64-> < do
+    dup sizeof(op) * ops +
+    // intrisics
+    if dup ops.type 64->	    OP_INTRISIC_PLUS = do 
+      sim-stack-pop sim-stack-pop	+ sim-stack-push  
+
+    else if dup ops.type 64-> OP_INTRISIC_MINUS = do
+      sim-stack-pop sim-stack-pop swap	- sim-stack-push
+
+    else if dup ops.type 64-> OP_INTRISIC_EQUALS = do
+      sim-stack-pop sim-stack-pop = sim-stack-push
+
+    else if dup ops.type 64-> OP_INTRISIC_MULT = do
+      sim-stack-pop sim-stack-pop * sim-stack-push
+
+    else if dup ops.type 64-> OP_INTRISIC_GTHAN = do 
+      sim-stack-pop sim-stack-pop < sim-stack-push
+
+    else if dup ops.type 64-> OP_INTRISIC_LTHAN = do 
+      sim-stack-pop sim-stack-pop > sim-stack-push
+
+    else if dup ops.type 64-> OP_INTRISIC_NOT_EQUALS = do 
+      sim-stack-pop sim-stack-pop != sim-stack-push
+
+    else if dup ops.type 64-> OP_PUSH_INT = do  
+      dup 8 + 64-> sim-stack-push		      
+
+    // built-in procs
+    else if dup ops.type 64-> OP_DUMP = do 
+      sim-stack-pop dump			      
+
+    else if dup ops.type 64-> OP_DUP = do
+      sim-stack-pop dup sim-stack-push sim-stack-push
+
+    else if dup ops.type 64-> OP_DROP = do
+      sim-stack-pop drop
+
+    else if dup ops.type 64-> OP_OVER = do
+      // b c
+      sim-stack-pop sim-stack-pop 
+      swap over
+      sim-stack-push sim-stack-push sim-stack-push
+    
+    else if dup ops.type 64-> OP_ROT = do
+      sim-stack-pop  sim-stack-pop  sim-stack-pop
+      rot rot
+      sim-stack-push sim-stack-push sim-stack-push  
+    end end end end end end end end end end end end end
+    drop 1 +
+  end
+end
+// COMPILATION SECTION -------------------------------------
+#define compile-ops as 
+  if NUM_OF_OPS 13 != do
+    here						  eputs
+    ": Exhaustive handling operations in compile-mode\n"  eputs
+    1 exit
+  end
+  if create-file false = do
+    // if the file already exists we try to delete the file by their name
+    output-file-path str.data  64-> fdel 
+    if dup 0 < do
+      ": ERROR: Could not create a output file\n" eputs
+      1 exit
+    end
+    create-file
+  end
+  // TODO:
+  //	External commands
+  "BITS 64\n"				 fd fwrite
+  "dump:\n"		    		 fd fwrite
+  "  push  rbp\n"	    		 fd fwrite
+  "  mov   rbp, rsp\n"	    		 fd fwrite
+  "  sub   rsp, 64\n"	    		 fd fwrite
+  "  mov   QWORD  [rbp-56], rdi\n"	 fd fwrite
+  "  mov   QWORD  [rbp-8], 1\n"		 fd fwrite
+  "  mov   eax, 32\n"			 fd fwrite
+  "  sub   rax, QWORD  [rbp-8]\n"	 fd fwrite
+  "  mov   BYTE  [rbp-48+rax], 10\n"	 fd fwrite
+  ".L2:\n"				 fd fwrite
+  "  mov   rcx, QWORD  [rbp-56]\n"	 fd fwrite
+  "  mov   rdx, -3689348814741910323\n"  fd fwrite
+  "  mov   rax, rcx\n"			 fd fwrite
+  "  mul   rdx\n"			 fd fwrite
+  "  shr   rdx, 3\n"			 fd fwrite
+  "  mov   rax, rdx\n"			 fd fwrite
+  "  sal   rax, 2\n"			 fd fwrite
+  "  add   rax, rdx\n"			 fd fwrite  
+  "  add   rax, rax\n"			 fd fwrite 
+  "  sub   rcx, rax\n"			 fd fwrite 
+  "  mov   rdx, rcx\n"			 fd fwrite 
+  "  mov   eax, edx\n"			 fd fwrite 
+  "  lea   edx, [rax+48]\n"		 fd fwrite 
+  "  mov   eax, 31\n"			 fd fwrite 
+  "  sub   rax, QWORD  [rbp-8]\n"	 fd fwrite 
+  "  mov   BYTE  [rbp-48+rax], dl\n"	 fd fwrite 
+  "  add   QWORD  [rbp-8], 1\n"		 fd fwrite 
+  "  mov   rax, QWORD  [rbp-56]\n"	 fd fwrite 
+  "  mov   rdx, -3689348814741910323\n"	 fd fwrite 
+  "  mul   rdx\n"			 fd fwrite 
+  "  mov   rax, rdx\n"			 fd fwrite 
+  "  shr   rax, 3\n"			 fd fwrite 
+  "  mov   QWORD  [rbp-56], rax\n"	 fd fwrite 
+  "  cmp   QWORD  [rbp-56], 0\n"	 fd fwrite 
+  "  jne   .L2\n"			 fd fwrite 
+  "  mov   eax, 32\n"			 fd fwrite 
+  "  sub   rax, QWORD  [rbp-8]\n"	 fd fwrite 
+  "  lea   rdx, [rbp-48]\n"		 fd fwrite 
+  "  lea   rcx, [rdx+rax]\n"		 fd fwrite 
+  "  mov   rax, QWORD  [rbp-8]\n"	 fd fwrite 
+  "  mov   rdx, rax\n"			 fd fwrite 
+  "  mov   rsi, rcx\n"			 fd fwrite 
+  "  mov   edi, 1\n"			 fd fwrite 
+  "  mov   rax, 1\n"			 fd fwrite 
+  "  syscall\n"				 fd fwrite 
+  "  nop\n"				 fd fwrite 
+  "  leave\n"				 fd fwrite 
+  "  ret\n"				 fd fwrite 
+  "global _start\n"			 fd fwrite 
+  "segment .text\n"			 fd fwrite 
+  "_start:\n"				 fd fwrite 
+  "    mov [args_ptr], rsp\n"		 fd fwrite 
+  // TODO:
+  // 	better if-else structure
+  //  optype op 
+  // drop
+  0 while dup ops-count 64-> < do
+   // index+1
+   // index ()sizeof(op)*ops+ptr) -- ptr)
+   dup sizeof(op) * ops + 
+
+   if dup ops.type 64-> OP_PUSH_INT = do 
+      make-label
+      "    ;; ---- push int value=`"    fd fwrite dup ops.op  64-> int-to-string   fd fwrite "`\n"  fd fwrite 
+      "    push "		        fd fwrite dup ops.op  64-> int-to-string   fd fwrite "\n"   fd fwrite  
+    else if dup ops.type 64-> OP_INTRISIC_PLUS = do  
+      make-label
+      "    ;; ----intrisic-`+`\n"   fd fwrite 
+      "    pop rbx\n"		    fd fwrite 
+      "    pop rax\n"		    fd fwrite 
+      "    add rax, rbx\n"	    fd fwrite 
+      "    push rax\n"		    fd fwrite 
+
+    else if dup ops.type 64-> OP_INTRISIC_MINUS = do
+      make-label
+      "	   ;; ----intrisic-`-`\n"   fd fwrite 
+      "	   pop rax\n"		    fd fwrite 
+      "	   pop rbx\n"		    fd fwrite 
+      "	   sub rbx, rax\n"    	    fd fwrite 
+      "	   push rbx\n"	      	    fd fwrite 
+    else if dup ops.type 64-> OP_INTRISIC_MULT = do
+      make-label
+      "    ;; ----intrisic-`*`\n"   fd fwrite 
+      "    pop rax\n"          	    fd fwrite    
+      "    pop rbx\n"          	    fd fwrite    
+      "    mul rbx\n"          	    fd fwrite   
+      "    push rax\n"	       	    fd fwrite 		   
+    else if dup ops.type 64-> OP_INTRISIC_GTHAN = do
+      make-label
+      "    ;; ----intrisic-`>`\n"   fd fwrite 
+      "    mov rcx, 0\n"       	    fd fwrite 
+      "    mov rdx, 1\n"       	    fd fwrite 
+      "    pop rbx\n"	       	    fd fwrite 
+      "    pop rax\n"	       	    fd fwrite 
+      "    cmp rax, rbx\n"     	    fd fwrite 
+      "    cmovg rcx, rdx\n"   	    fd fwrite 
+      "    push rcx\n"	       	    fd fwrite 
+    else if dup ops.type 64-> OP_INTRISIC_EQUALS = do
+      make-label
+      "    ;; ----intrisic-`=`\n"   fd fwrite 
+      "    mov rcx, 0\n"       	    fd fwrite 
+      "    mov rdx, 1\n"       	    fd fwrite 
+      "    pop rax\n"	       	    fd fwrite 
+      "    pop rbx\n"	       	    fd fwrite 
+      "    cmp rax,rbx\n"      	    fd fwrite 
+      "    cmove rcx, rdx\n"   	    fd fwrite 
+      "    push rcx\n"	       	    fd fwrite 
+    else if dup ops.type 64-> OP_INTRISIC_NOT_EQUALS = do
+      make-label
+      "    ;; ----intrisic-`!=`\n"  fd fwrite  
+      "    mov rcx, 0\n"	    fd fwrite  
+      "    mov rdx, 1\n"	    fd fwrite  
+      "    pop rbx\n"		    fd fwrite 
+      "    pop rax\n"		    fd fwrite	 
+      "    cmp rax, rbx\n"	    fd fwrite 
+      "    cmovne rcx, rdx\n"	    fd fwrite 
+      "    push rcx\n"		    fd fwrite  
+    else if dup ops.type 64-> OP_DUMP = do 
+      make-label
+      "    ;; ----call dump\n"	    fd fwrite 
+      "    pop rdi\n"		    fd fwrite  
+      "    call dump\n"		    fd fwrite 
+    else if dup ops.type 64-> OP_DUP = do
+      make-label
+      "    ;; ----intrisic-`dup`\n"fd fwrite
+      "    pop rax\n"		    fd fwrite
+      "    push rax\n" 		    fd fwrite
+      "    push rax\n" 		    fd fwrite
+    else if dup ops.type 64-> OP_DROP = do
+      make-label
+      "    ;; ----intrisic-`drop`\n"fd fwrite
+      "    pop rax\n"               fd fwrite
+    else if dup ops.type 64-> OP_OVER = do
+      make-label
+      "    ;; ----intrisic-`over`\n"fd fwrite
+      "    pop rax\n"               fd fwrite  
+      "    pop rbx\n"               fd fwrite  
+      "    push rbx\n"              fd fwrite  
+      "    push rax\n"              fd fwrite  
+      "    push rbx\n"              fd fwrite  
+    else if dup ops.type 64-> OP_ROT  = do
+      make-label
+      "    ;; ----intrisic-`rot`\n" fd fwrite
+      "    pop rax\n"		    fd fwrite 
+      "    pop rbx\n" 		    fd fwrite 
+      "    pop rcx\n" 		    fd fwrite 
+      "    push rbx\n"		    fd fwrite  
+      "    push rax\n"		    fd fwrite  
+      "    push rcx\n"		    fd fwrite 
+   end end end end end end end end end end end end
+   swap 1 +
+  end
+
+   "segment .bss\n"	       fd fwrite
+   "buffer:    resb "  fd fwrite BUFFER_MEMORY_CAPACITY int-to-string  fd fwrite "\n"  fd fwrite
+   drop
+end
+#define create-file as 
+  O_CREAT O_WRONLY +
+  output-file-path str.data 64-> // file-name
+  AT_FDCWD
+  openat
+  if dup 0 < do
+    close drop
+    false
+  else 
+    fd swap 64<-
+    close drop
+    true
+  end
+
+end
+#define make-label as
+  "__nat_label_"		      fd fwrite
+  com-label-count 64-> int-to-string  fd fwrite 
+  ":\n"				      fd fwrite 
+  com-label-count inc64
+end
+#define print-ops as
+  0 while dup ops-count  64-> < do
+    dup sizeof(op) * ops +
+    "Type: "  eputs dup	ops.type      64-> dump
+    "Op: "    eputs	ops.op	      64-> dump
+    "--------------------\n" eputs
+    1 +
+  end drop
+end
+
+proc main do
+  "TODO: parse cmd arguments\n"puts
+  if argc 1 < do
+    stderr usage
+    "ERROR: Not enough arguments\n" eputs
+    1 exit
+  end
+  goffi-mode	  COMPILATION_MODE 64<-
+  input-file-path 1 64<-
+  // TODO: change the file to fit the new update of procedures
+  //lex-file
+end
+
+

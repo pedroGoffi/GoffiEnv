@@ -1,0 +1,41 @@
+#include "std/std.gfsl"
+#define ROW_LENGHT as 30  end
+#define ROW_HEIGHT as ROW_LENGHT 2 + end
+#define TRUE_CHAR  as "*" end
+#define FALSE_CHAR as " " end
+static buffer ROW_LENGHT end // reserve in the bss
+
+proc dump_rule110 do
+  mem ROW_LENGHT + 1 store8
+  0 while dup ROW_LENGHT < do
+    0 while dup ROW_HEIGHT < do
+      if dup mem cast(int) + cast(ptr) load8 cast(bool) do
+        TRUE_CHAR
+      else
+        FALSE_CHAR
+      end
+      puts
+      1 +
+    end drop
+    "\n" puts
+    1 mem 30 + puts
+  
+    mem load8 1 <<
+    mem 1 + load8
+    or
+    1 while dup ROW_LENGHT < do
+      swap 1 << 7 and
+      over mem + 1 + load8 or
+      2dup 110 swap >> 1 and
+      swap mem + swap store8
+      swap
+      1 +
+    end drop drop 
+    1 +
+  end drop
+end
+
+proc main do
+   "NOTE: this doesnt work for now\n" puts
+   
+end

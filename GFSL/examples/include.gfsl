@@ -1,0 +1,7 @@
+#include "./std/std.gfsl"
+
+proc main do
+  "Puts only works if you include std.gfsl\n"							puts
+  "Obs: i used /std/std.gfsl and not std.gfsl because the test file is use in the root\n"	puts
+  "Dont try to compile it here, instead go a folder back\n"					puts
+end

@@ -1,0 +1,9 @@
+proc main(): int // declared return type
+{
+  return 69420;
+}
+proc main() // auto return type
+{
+  return 420;
+
+}

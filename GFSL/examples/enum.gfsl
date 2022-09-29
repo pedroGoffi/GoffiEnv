@@ -1,0 +1,19 @@
+#include "std/std.gfsl"
+// defined:
+enum OpType
+  PUSH_INT 
+  SYSCALL
+  OP_COUNT         
+end
+
+// usage:
+//   <enum_name>::<enum_field>
+proc main do
+  if OpType::OP_COUNT 2 != do
+    "Exaustive handling OP_COUNT\n" puts
+    1 exit
+  end
+  "Enum in gfsl context are macros with offsets of 1\n"	puts
+  "They are literally implemented in about 12 lines\n"  puts
+end
+

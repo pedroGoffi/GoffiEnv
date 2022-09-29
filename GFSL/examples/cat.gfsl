@@ -1,0 +1,55 @@
+#include "std/std.gfsl"
+
+proc main do
+  if argc 2 < do
+    "Usage: "					eputs
+    1 nth_argv g-str				eputs
+    " <file>\n"					eputs
+    "ERROR: no input file is provided\n"	eputs
+    1 exit
+  end
+
+  420         // sex numba 
+  O_READONLY  // flags
+  2 nth_argv  // file-path
+  AT_FDCWD    // dirfd
+  openat      // syscall
+  if dup 0 < do
+    "ERROR: Could not open the file `"	eputs
+    2 nth_argv g-str			eputs
+    "`\n"				eputs
+    1 exit
+  end
+  "File is opened\n"				puts
+  "We just read the size of the file\n"		puts
+  "Now we will memory map it to a variable\n"	puts
+  "Then print on the stdout\n"			puts
+  
+  local file-descriptor sizeof(ptr) end
+  file-descriptor swap 64<-
+
+  local stat-buffer sizeof(ptr) end   
+  if    stat-buffer file-descriptor 64-> fstat 0 < do 
+    "ERROR: Could not mesure the size of the file\n" eputs
+    1 exit
+  end
+  
+  local file-content sizeof(stat) end
+  stat-buffer stat.st_size 	  64-> // basically the file size
+  file-content str.count swap 	  64<- // *file-content.size = file-size
+
+  // mmap
+  0 file-descriptor 64->
+  MAP_PRIVATE
+  PROT_READ
+  file-content str.count 64->
+  null
+  mmap
+  // --- endof mmap
+  
+  file-content str.data swap 64<- // store file content in str.data
+  // note: str.data is just a offset of file-content
+
+  file-content str-> puts
+
+end

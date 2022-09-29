@@ -1,0 +1,15 @@
+#include "std/std.gfsl"
+
+proc main do
+  "examples/some_random_file.text" swap drop
+  SYS_unlink
+  syscall1
+
+  if dup 0 < do
+    "Could not rm the file`"		eputs
+    "examples/some_random_file.txt"	eputs
+    "`\n"				eputs
+    1 exit
+  end
+end
+

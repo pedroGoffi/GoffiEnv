@@ -1,0 +1,8 @@
+	global __start
+__start:
+	mov rsp, esp
+	sub esp, 8
+	mov QWORD [rsp - 8], 10
+	push QWORD [rsp - 8]
+	mov eax, 0
+	leave

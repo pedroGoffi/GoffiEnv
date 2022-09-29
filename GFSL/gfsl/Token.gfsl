@@ -1,0 +1,55 @@
+// A TOKEN TYPE CAN BA A NUMBER BINARY OR NUMBER
+
+
+enum token_type
+   NUMBER
+   BINARY_OP
+   NAME
+   token_type_count
+end
+static_assert "Exhaustive handling token_type, please update the program"
+              token_type::token_type_count 3 =
+	      end
+	      
+#define tk.type		as 0 +  end	// u64 enum token_type
+#define tk.atomName	as 8 +  end 	// string
+#define tk.loc.col	as 16 + end	// u64
+#define tk.loc.line	as 24 + end	// u64
+#define tk.linked_to	as 32 + end	// u64
+#define sizeof(Token)	as 40   end
+#define TOKEN_LIST_CAP  as 1000 end
+static token_array sizeof(Token) TOKEN_LIST_CAP * end
+static token_array_last  sizeof(u64) end
+
+proc dump_token ptr -> ptr
+do
+  // ptr
+  "Token name: " puts
+  dup tk.atomName str-> puts
+  ", Token loc.col: " puts
+  dup tk.loc.col 64-> dump
+  ", Token loc.line: " puts
+  dup tk.loc.line 64-> dump
+  ", Token linked_to: " puts
+  dup tk.linked_to 64-> dump
+
+end
+
+proc token_push_array ptr -> void do
+  drop
+  "TOKEN INDEX: " puts
+  token_array_last 64-> dump
+  "------------\n" puts
+  token_array_last inc64
+end
+proc save_token_from_word ptr ptr -> ptr do
+  local dst sizeof(Token) end
+  local src sizeof(Token) end
+  64-> src swap ptr<-
+  64-> dst swap ptr<-
+  src tk.atomName str-> puts
+
+  dst
+  token_push_array
+  dst
+end

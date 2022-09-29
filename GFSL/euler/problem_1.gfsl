@@ -1,0 +1,11 @@
+#include "std/std.gfsl"
+proc main do
+  1 2 while over 4000000 < do
+    if over 2 mod 0 = do
+      over mem load64 + mem swap store64
+    end
+    swap over +
+  end
+  mem load64 dump
+  drop drop
+end

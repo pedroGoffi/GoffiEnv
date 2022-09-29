@@ -1,0 +1,24 @@
+
+define factorial as
+  // usage:
+  // N factorial will return N factorial
+  1 swap while dup 1 > do
+    dup 
+    swap rot *
+    swap 1 -
+  end drop
+end
+
+define sum_range as 
+  // usage:
+  // MAX sum_range will return the sommatory of 0 to MAX
+  1 swap while dup 1 > do
+    dup
+    rot
+    +
+    swap
+    1 -
+  end drop
+end
+
+

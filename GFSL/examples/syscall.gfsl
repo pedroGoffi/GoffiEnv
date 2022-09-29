@@ -1,0 +1,13 @@
+#include "std/std.gfsl"
+
+
+proc exit2 do
+  "i will exit the program\n"		puts
+   0 exit // NOTE: exit defined in std.gfsl
+  "after exit this shall not appear\n"	puts
+end
+
+
+proc main do
+  exit2
+end

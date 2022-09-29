@@ -1,0 +1,10 @@
+#include "std/std.gfsl"
+
+proc main do
+  local i sizeof(u64) end
+  i 0 ptr<-
+  while i 64-> 10 < do
+    i 64-> dump
+    i inc64
+  end
+end

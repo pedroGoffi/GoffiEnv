@@ -1,0 +1,42 @@
+#include "std/std.gfsl"
+//  NOTE: console.getLine accepts a single ptr
+//    and asign this ptr an SV::string_view with the info of the
+//    console input
+//  We also have cin in std lib it is like console.getLine but with more
+//   low lvl of abstraction
+//   beeing almost equal of doing a input with ASM x86_64
+
+#define MAX_W_CAP as 256 end
+proc cin_method void -> void do
+  local name MAX_W_CAP end
+  // NOTE: In this case a new line is added
+  //   but with console.getLine we remove it
+  
+  "cin_method:\n> "	puts
+  MAX_W_CAP
+  name
+  cin
+  
+  "Hello `"		puts
+  name			puts
+  "` !^\(^-^)/-\n"	puts 
+end
+// NOTE:
+//  SV::string_view = struct{
+//   size_t       size_of_string; == str.count
+//   std::string  data;           == str.data
+//  };
+// NOTE:
+//  puts   accept int ptr
+//  putstr accept ptr to a SV::string_view
+
+proc main do // console.getLine method
+  local name sizeof(str) end
+  "What is your name?\n>  "	puts
+  name
+  console.getLine  
+  "Hello `"			puts
+  name				putstr
+  "` !^\(^-^)/-\n"		puts
+  cin_method
+end

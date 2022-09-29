@@ -1,0 +1,476 @@
+#include "std/ascii.gfsl"
+#include "std/core.gfsl"
+
+#define stdin  as 0 end
+#define stdout as 1 end
+#define stderr as 2 end
+// --- SOME BUILT-IN CONSTANTS
+#define null as 0 end
+#define NULL as 0 end
+#define true as 1 cast(bool) end
+#define True as 1 cast(bool) end
+#define TRUE as 1 cast(bool) end
+
+#define false as 0 cast(bool) end
+#define False as 0 cast(bool) end
+#define FALSE as 0 cast(bool) end
+
+
+#define sizeof(bool)	as 1      end
+#define sizeof(int8_t)	as 1      end
+#define sizeof(int16_t)	as 2      end
+#define sizeof(int32_t) as 4      end
+#define sizeof(int64_t) as 8      end
+#define sizeof(u64)     as 8      end
+#define sizeof(size_t)	as 8      end
+#define sizeof(ptr)	as 8      end
+#define sizeof(str)	as 16	  end
+#define str.count	as null + end
+#define str.data	as 8 +    end
+
+// --- sizeof structs used in self-hosting
+#define sizeof(stat)		 as 144	  end
+#define stat.st_dev		 as 0	+ end
+#define sizeof(stat.st_dev)	 as 8	  end
+#define stat.st_ino		 as 8	+ end
+#define sizeof(stat.st_ino)	 as 8	  end
+#define stat.st_mode		 as 24	+ end
+#define sizeof(stat.st_mode)	 as 4	  end
+#define stat.st_nlink		 as 16 	+ end
+#define sizeof(stat.st_nlink)	 as 8	  end
+#define stat.st_uid		 as 28 	+ end
+#define sizeof(stat.st_uid)	 as 4	  end
+#define stat.st_gid		 as 32 	+ end
+#define sizeof(stat.st_gid)	 as 4	  end
+#define stat.st_rdev		 as 40 	+ end
+#define sizeof(stat.st_rdev)	 as 8	  end
+#define stat.st_size		 as 48 	+ end
+#define sizeof(stat.st_size)	 as 8	  end
+#define stat.st_blksize		 as 56 	+ end
+#define sizeof(stat.st_blksize)	 as 8	  end
+#define stat.st_blocks		 as 64 	+ end
+#define sizeof(stat.st_blocks)	 as 8	  end
+#define stat.st_atim		 as 72 	+ end
+#define sizeof(stat.st_atim)	 as 16	  end
+#define stat.st_mtim		 as 88 	+ end
+#define sizeof(stat.st_mtim)	 as 16	  end
+#define stat.st_ctim		 as 104	+ end
+#define sizeof(stat.st_ctim)	 as 16	  end
+// --- SOME USEFUL PROCS
+#define str-> as 
+  // accept a ptr to a struct SV as const char* data; size_t count end
+  dup  str.count  load64
+ swap str.data	  load64 cast(ptr)
+end
+// INPUT STREAM
+proc fcin int ptr int -> int do SYS_read syscall3 end
+proc cin  int ptr     -> int do stdin fcin end
+
+
+#define MAX_WORD_INPUT_CAP as 1024 end
+proc console.getLine ptr -> void do
+  local result MAX_WORD_INPUT_CAP end
+
+  MAX_WORD_INPUT_CAP
+  result
+  cin
+  if result over + 1 - load8 10 = do 1 - end
+  over str.count swap       store64
+  str.data result cast(int) store64
+   
+end
+
+
+#define div as divmod drop end
+#define mod as divmodswap drop end
+#define 2drop as drop drop end
+#define 2dup as over over end
+
+
+// string   operation
+
+#define cstr-> as 
+  dup str-len swap     
+end
+
+
+#define chop-word as 
+  2dup str.data 64-> swap str.data swap 64<-
+  over str.count 0 64<-
+  while 
+    if	dup str.count 64->  0 > do
+        dup str.data  64->  8-> ascii_SPACE != 
+    else 
+      false 
+    end
+  do 
+
+    dup str.count dec64
+    dup str.data  inc64
+    swap dup str.count inc64
+    swap 
+  end
+
+  if dup str.count 64-> 0 > do
+    dup str.count dec64
+    dup str.data inc64 
+  end
+  2drop
+end
+
+#define trim-left as 
+  // x a b
+  while
+    if dup str.count 64-> 0 > do
+       dup str.data 64-> 8-> ascii_SPACE =
+    else
+      false
+    end
+  do 
+    dup str.count dec64
+    dup str.data  inc64
+  end 
+  drop
+  drop
+end
+// pointers operation
+// ptr -- *ptr
+#define 8->  as 	load8		end
+#define 8<-  as 	store8		end
+#define 64-> as 	load64		end 
+#define 64<- as 	store64		end
+#define bool-> as load64			end
+#define bool<- as cast(int) store64	end
+#define ptr-> as load64			end
+#define ptr<- as cast(int) store64	end
+#define str.data->  as str.data 64->	end
+#define str.count-> as str.count 64->	end
+#define str.data<-  as str.data 64<-	end
+#define str.count<- as str.count 64<-	end
+
+#define str-len as 
+  0 swap while dup load8 0 != do
+    1 + swap 1 + swap
+  end drop
+end
+
+proc inc64 ptr -> void do
+  dup 64-> 1 + 64<-
+end
+proc inc64_by ptr int -> void do
+  // ptr val
+  over 64-> + 64<-
+end
+#define dec64 as 
+  dup 64-> 1 - 64<-
+end
+
+
+
+
+proc  nth_argv int -> ptr do
+  8 * __argc cast(int) + cast(ptr) load64 cast(ptr)
+end
+proc argc void -> int do __argc 64-> end
+proc argv void -> ptr do __argv 64-> cast(ptr) end
+
+
+#define __streq as 
+  string.a  str_assign
+  string.b  str_assign
+  if string.a str.count-> string.b str.count-> = do
+    0 while 
+      if dup  string.a str.count-> < do
+	 dup  string.a str.data-> + 8->
+	 over string.b str.data-> + 8->
+	 =
+      else false end
+    do 1 + end
+    string.a str.count-> >=
+  else false end
+end
+
+#define g-streq as swap drop cstreq end
+#define g-str as 
+  dup str-len swap
+end
+#define str-copy-sv as 
+  // dst src 
+  2dup
+  str.data  64-> swap str.data swap 64<-
+  str.count 64-> swap str.count swap 64<-
+end
+#define str-sv-to-gstr as 
+  // int &ptr.count
+  rot
+  2dup
+  str.data  swap 64<-
+  swap drop
+  str.count swap 64<-
+end
+#define is-digit as 
+  dup  ascii_0 >= 
+  swap ascii_9 <= 
+  and
+end
+#define +ptr	  as inc64 end 
+#define -ptr	  as dec64 end
+// PROCEDURES
+
+#define PUTD_BUFFER_CAP  as 32 end
+static putd_buffer  PUTD_BUFFER_CAP end
+proc itos int -> str
+do
+  local acc   sizeof(str) end
+  local digit sizeof(u64) end
+  digit swap ptr<-
+  if digit 64-> 0 = do
+    "0" acc str_assign
+  else    
+    digit 64-> 
+    putd_buffer PUTD_BUFFER_CAP +
+    while over 0 > do
+      1 - dup rot
+      10 divmod
+      rot swap ascii_0 + 
+      8<- swap
+    end
+    dup
+    putd_buffer PUTD_BUFFER_CAP +
+    swap - cast(int)
+    swap   cast(ptr)
+    acc    str_assign    
+  end
+  acc str->
+end
+
+proc fputs  str int -> void	do write drop			end
+proc fputu  int int -> void     do swap itos rot write drop     end
+proc eputs  str     -> void	do stderr fputs			end
+proc eputu  int     -> void     do itos stderr fputs            end
+proc puts   str     -> void	do stdout fputs			end
+proc putu   int     -> void     do itos stdout fputs            end
+proc putstr ptr     -> void     do str-> puts                   end
+proc print  int     -> int	do dup dump			end
+proc exit   int	    -> void	do SYS_exit syscall1 drop	end
+
+proc get_new_file_stream ptr -> int do
+  local file_path       sizeof(str)  end
+  dup str-len file_path str.count swap cast(int) 64<-
+      	      file_path str.data  swap cast(int) 64<-
+  420
+  O_CREAT O_WRONLY +
+  file_path str.data 64->
+  AT_FDCWD
+  openat
+  if dup 0 < do
+    "ERROR: could not open the file `"	eputs
+    file_path str->			eputs
+    "`\n"				eputs
+    1 exit
+  end
+
+end
+// open_file procedure:
+//   ptr to the string of the file_path
+//   ->
+//   file_string size
+//   ptr to the file string
+proc open_file ptr -> str do
+  local file_path       sizeof(str)  end
+  local file_descriptor sizeof(ptr)  end
+  local stat_buffer     sizeof(stat) end
+  local file_content    sizeof(stat) end  
+  dup str-len file_path str.count swap cast(int) 64<-
+      	      file_path str.data  swap cast(int) 64<-
+
+  420
+  O_READONLY
+  file_path str.data 64->
+  AT_FDCWD
+  openat
+  if dup 0 < do
+    "ERROR: could not open the file `"	eputs
+    file_path str->			eputs
+    "`\n"				eputs
+    1 exit
+  end
+  file_descriptor swap 64<-
+
+  if stat_buffer file_descriptor 64-> fstat 0 < do
+    "ERROR: could not mesure the size of the file `"	eputs
+    file_path str->					eputs
+    "`\n"						eputs
+    1 exit
+  end
+
+  0 file_descriptor 64->
+  MAP_PRIVATE
+  PROT_READ
+  stat_buffer stat.st_size 64->
+  NULL
+  mmap
+  file_content swap 64<-
+  
+  if file_content 64-> 0 < do
+    "ERROR: could not memory map the file `"	eputs
+    file_path str->				eputs
+    "`\n"					eputs
+    1 exit    
+  end
+  stat_buffer stat.st_size 64->
+  file_content
+end
+
+// ptr src
+// ptr dst
+proc chop_line ptr -> ptr do 
+  local line_string sizeof(str) end
+  local line_input  sizeof(str) end
+  dup str.count 64-> line_input str.count swap ptr<-
+  dup str.data  64-> line_input str.data  swap ptr<-
+  
+  line_string str.data 
+  line_input  str.data 64->
+  ptr<-
+    
+  line_string str.count 0 ptr<-
+
+  while
+    line_input str.count ptr-> 0 > // must
+    line_input str.data  ptr-> cast(ptr) 8->
+    ascii_LF !=
+    and
+  do
+    line_input str.count  dec64
+    line_input str.data   inc64
+    line_string str.count inc64
+  end
+  if line_input str.count 64-> 0 > do
+    line_input str.count dec64
+    line_input str.data  inc64    
+  end
+  // save the line_input to the input original pointer 
+  dup str.data  line_input str.data  64-> ptr<-
+      str.count line_input str.count 64-> ptr<-      
+  line_string
+end
+proc chop_word ptr -> ptr do
+  local line_string sizeof(str) end
+  local line_input  sizeof(str) end
+  dup str.count 64-> line_input str.count swap ptr<-
+  dup str.data  64-> line_input str.data  swap ptr<-
+  
+  line_string str.data 
+  line_input  str.data 64->
+  ptr<-
+    
+  line_string str.count 0 ptr<-
+
+  while
+    line_input str.count ptr-> 0 > // must
+    line_input str.data  ptr-> cast(ptr) 8->
+    ascii_SPACE !=
+    and
+  do
+    line_input str.count  dec64
+    line_input str.data   inc64
+    line_string str.count inc64
+  end
+  if line_input str.count 64-> 0 > do
+    line_input str.count dec64
+    line_input str.data  inc64    
+  end
+  // save the line_input to the input original pointer 
+  dup str.data  line_input str.data  64-> ptr<-
+      str.count line_input str.count 64-> ptr<-      
+  line_string
+end
+
+// ptr src
+// ptr dst
+proc trim_left ptr -> ptr do 
+  local line_string sizeof(str) end
+  local line_input  sizeof(str) end
+  dup str.count 64-> line_input str.count swap ptr<-
+  dup str.data  64-> line_input str.data  swap ptr<-
+  
+  line_string str.data 
+  line_input  str.data 64->
+  ptr<-
+    
+  line_string str.count 0 ptr<-
+
+  while
+    line_input str.count ptr-> 0 > // must
+    line_input str.data  ptr-> cast(ptr) 8->
+    ascii_SPACE =
+    and
+  do
+    line_input str.count  dec64
+    line_input str.data   inc64
+    line_string str.count inc64
+  end
+
+  // save the line_input to the input original pointer 
+  dup str.data  line_input str.data  64-> ptr<-
+      str.count line_input str.count 64-> ptr<-      
+  line_string
+end 
+
+
+proc streq str str  -> bool do
+  local A   sizeof(str)  end
+  local B   sizeof(str)  end
+
+
+  A str_assign
+  B str_assign
+
+  if A str.count 64->
+     B str.count 64->
+     =
+  do
+    // for i -> A.count and A[i] == B[i]
+    local iter sizeof(u64) end
+    iter 0 ptr<-
+    while      
+      A str.data 64-> cast(ptr) 8->
+      B str.data 64-> cast(ptr) 8->
+      =      
+    do
+
+ 
+      A str.count dec64
+      A str.data  inc64
+      
+      B str.count dec64
+      B str.data  inc64
+      
+    end
+  end
+  true
+  if A str.count 64-> 0 != do
+    drop false
+  end
+  
+end
+proc str_to_ptr str -> ptr
+do
+  local res sizeof(str) end
+  // int ptr e.data
+  res str.data  swap ptr<-
+  res str.count swap ptr<-
+  res
+end
+// PRINT STREAM
+
+#define inot as
+  cast(int) 0 =
+end
+proc str_assign str ptr -> void do
+  //  dst.count=int
+  //  dst.data=  
+ swap over str.data   swap ptr<-
+            str.count swap ptr<-
+end

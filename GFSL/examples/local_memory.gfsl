@@ -1,0 +1,30 @@
+#include "std/std.gfsl"
+
+proc main do
+  // what a local memory is?
+  // think about your stack as a big rectangle
+  // stack: 0 --------------- 10
+  // an local memory will reserve some space in this memory and when called
+  // will push the beginning of the local region
+  // example:
+  // stack: 0 --------------- 10
+  // code: local a 2 end
+  // stack: 0 -- 2 ---------- 10
+  // code: a
+  //    push [rax+0]
+  // code: local c 5 end
+  // stack: 0 -- 2 --- 5 ---- 10
+  // code: a b
+  // push [rax+0] // beginning of A
+  // push [rax+2] // end of A
+  
+  local uwu 8 end 
+  local owo 8 end
+
+  uwu 69  64<-
+  owo 420 64<-
+
+  uwu 64-> dump
+  owo 64-> dump
+  
+end

@@ -1,0 +1,5 @@
+#include "std/std.gfsl"
+
+proc main do
+  "hello, world\n" puts
+end

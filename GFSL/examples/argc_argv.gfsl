@@ -1,0 +1,14 @@
+#include "std/std.gfsl"
+
+proc cstr_to_gstr ptr -> str do dup str-len swap end
+
+proc main do
+  local i sizeof(u64) end
+  i 1 64<-
+  while i 64-> argc <= do
+    "arg: |"				puts
+    i 64-> nth_argv cstr_to_gstr	puts
+    "|\n"				puts
+    i inc64
+  end
+end

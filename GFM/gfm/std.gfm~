@@ -1,0 +1,15 @@
+
+main:
+  push 0 // i
+loop:
+  dup 0
+  dup 0
+  push 1
+  addi
+  store8
+
+  push 1
+
+
+  push 0
+  native exit

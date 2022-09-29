@@ -1,0 +1,70 @@
+#ifndef __VM
+#define __VM
+#include "../../common/utils.cpp"
+#include "./instruction.cpp"
+#include <vector>
+namespace VM{
+  void simulate(operation** program){
+    std::vector<Value> stack;
+    for(size_t i=0; i<buf__len(program); ++i){
+      operation* op = program[i];
+      switch(op->kind){
+      case operation_kind::noop:
+	printf("this is a noop.\n");
+	break;
+	
+      case operation_kind::push:
+	stack.push_back(op->as);
+	break;	
+
+      case operation_kind::add_INT: {
+	auto a = stack.back(); stack.pop_back();
+	auto b = stack.back(); stack.pop_back();
+        Value result = b;
+	result.INT += a.INT;
+	stack.push_back(result);	
+      } break;
+
+      case operation_kind::dump_INT: {
+	auto a = stack.back(); stack.pop_back();
+	printf("%i", a.INT);
+      } break;
+	
+      case operation_kind::dump_STRING: {
+	auto a = stack.back(); stack.pop_back();
+	printf("%s", a.STRING);
+      } break;
+      case operation_kind::jmp: {
+	i += op->as.INT;
+      } break;
+      case operation_kind::_abort: {
+	printf("ABORT not implemented yet.\n");
+	exit(1);
+      } break;
+      default:
+	fprintf(stderr,
+		"ERROR: unexpected instruction kind.\n");
+	exit(1);
+      }
+    }
+  }
+  void test_vm(){
+    operation** test = nullptr;
+
+#define make_op(x, ...)				\
+    operation* x = new operation{__VA_ARGS__};	\
+    buf__push(test, x);
+    
+    make_op(o1, .kind=push, .as={.INT=35});
+    make_op(o2, .kind=push, .as={.INT=34});
+    make_op(o3, .kind=add_INT);
+    make_op(o4, .kind=dump_INT);
+    make_op(o5, .kind=jmp, .as={.INT=3});
+    make_op(o6, .kind=push, .as={.STRING="hello, world\n"});
+    make_op(o7, .kind=dump_STRING);
+    
+    buf__push(test, o1);
+    VM::simulate(test);
+  }
+}
+#endif /* __VM */

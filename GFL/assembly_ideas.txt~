@@ -1,0 +1,21 @@
+Procedure{
+  const char* name
+  size_t localVarsSize
+  INSTRUCTIONS** 
+}
+
+start:
+  push rbp
+  mov rbp, rsp
+  sub rsp, SIZEOF GLOBAL VARS
+  jmp main
+  
+start.factorial:
+  push rbp
+  mov rbp, rsp
+  
+start.main:
+	
+  
+end of start
+end of the program

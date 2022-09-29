@@ -1,0 +1,23 @@
+#include "std/std.gfsl"
+
+proc main do
+  if argc 2 < do
+    "ERROR: could not found the second argument on the arguments\n"	eputs
+    "NOTE: usage is ./program <file>\n"					eputs
+    1 exit
+  end
+  420
+  O_CREAT O_WRONLY +
+  2 nth_argv
+  AT_FDCWD
+  openat
+  if dup 0 < do
+    "Could not create the file\n" eputs
+    1 exit
+  end
+  local fd sizeof(size_t) end
+
+  fd swap 64<-
+
+  "Im writing to this file\n" fd 64-> write drop  
+end

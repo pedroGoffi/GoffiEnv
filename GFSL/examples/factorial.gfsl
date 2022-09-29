@@ -1,0 +1,19 @@
+#include "std/std.gfsl"
+#define N as 5 end
+// NOTE: procedure return does not work with safe mode
+
+proc main do
+  "5 factorial is equal to " puts
+  local result sizeof(size_t) end
+  local i      sizeof(size_t) end
+  result 1 64<-
+  i      1 64<-
+  
+  while i 64-> N <= do
+    i 64-> result 64-> *	// result = result*(*i)
+    result swap 64<-
+    i inc64			// i += 1
+  end 
+  result 64-> dump		
+end
+

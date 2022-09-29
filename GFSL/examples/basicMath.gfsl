@@ -1,0 +1,18 @@
+#include "std/std.gfsl"
+proc main do
+  // almost all commands will interact with the stack
+  // example: code 10 2 +
+  // push 10
+  // push 2
+  // + --> pop A, pop B, push B+A
+  // dump: pop A then print
+  
+  "10 + 2 == 10 2 + => " puts
+  10 2  + dump
+  "10 - 2 == 10 2 - => " puts
+  10 2  - dump
+  "10 * 2 == 10 2 * => " puts
+  10 2  * dump
+end
+
+

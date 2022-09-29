@@ -1,0 +1,10 @@
+struct my
+   size int
+   data ptr 
+end
+
+static x struct my end
+proc main do  
+  my -> size
+  
+end

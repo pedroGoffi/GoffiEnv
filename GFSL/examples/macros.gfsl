@@ -1,0 +1,9 @@
+#include "std/std.gfsl"
+
+#define my_macro as
+  "This is my macro uwu\n" puts
+end
+
+proc main do
+  my_macro
+end

@@ -1,0 +1,4 @@
+#ifndef __GFSL
+#define __GFSL
+void translate_into_gfsl(AST_ROOT ast){}
+#endif /* __GFSL */

@@ -1,0 +1,9 @@
+var k := 10; // allocate 8 bytes
+
+<entry of label>
+  label+0: push rbp
+  label+3: mov rbp, rsp
+  label+5: sub rsp, 8
+  label+7: mov qword[rsp - 8], 10
+<end of label>
+

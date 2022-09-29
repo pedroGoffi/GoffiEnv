@@ -1,0 +1,13 @@
+#include "std/std.gfsl"
+
+#define case as 1 cast(bool) end
+
+proc main do
+  if case  do
+    "true case\n" puts
+  else
+    "else case\n" puts
+  end
+  
+end
+

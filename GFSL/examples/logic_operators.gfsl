@@ -1,0 +1,7 @@
+#include "std/std.gfsl"
+proc main do
+  true true   or  cast(int) dump
+  true false  or  cast(int) dump
+  true true   and cast(int) dump
+  true false  and cast(int) dump
+end

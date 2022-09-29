@@ -1,0 +1,1011 @@
+#define GLOBAL_MEM_CAP as 640000 end
+// NOTE: enum are just macros with <enum-name>'::" before the name
+// TODO: get rid of this in the future
+// WOULD BE COOL USE CONSTANTS :)
+enum OpType
+  PUSH_INT 
+  OP_DUMP  
+  OP_DUP
+  OP_SWAP
+  OP_OVER
+  OP_DROP
+  OP_ROT
+  OP_DIVMOD 
+  OP_SHL
+  OP_SHR
+  OP_AND
+  OP_OR
+  OP_NOT
+  OP_ARGC
+  OP_ARGV
+  OP_STORE8
+  OP_STORE64
+  OP_LOAD8
+  OP_LOAD64
+  OP_MEM
+  OP_IF
+  OP_WHILE
+  OP_DO
+  OP_ELSE
+  OP_END
+  OP_CALL_PROCEDURE
+  INTERNAL_SKIP_PROC
+  INTERNAL_PROC_ENTRY  
+  INTRISIC_PLUS
+  INTRISIC_PUSH_PTR
+  INTRISIC_SYSCALL0
+  INTRISIC_SYSCALL1
+  INTRISIC_SYSCALL2
+  INTRISIC_SYSCALL3
+  INTRISIC_SYSCALL4
+  INTRISIC_SYSCALL5
+  INTRISIC_SYSCALL6
+  OP_COUNT
+end
+static_assert
+  "Exhaustive handling OpType, please update the file"
+  OpType::OP_COUNT 37 =
+end
+#include "std/std.gfsl"
+// VARIABLE TABLES \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+#define RETURN_STACK_CAP as 4096 end
+// PROGRAM
+#define PROGRAM_CAP as 516 end
+#define vr.kind    as 0 + end
+#define vr.op      as 8 + end
+#define sizeof(vr) as 16 end
+static vr.count sizeof(u64) end
+static vr       sizeof(vr) PROGRAM_CAP * end
+
+// PROCEDURES
+#define PROC_CAP     as 516		     end
+#define PROC.name    as 0 +  	     	     end // 16
+#define PROC.pos     as 16 +                 end // 8
+#define sizeof(PROC) as 24	       	     end
+static PROC 	     sizeof(PROC) PROC_CAP * end
+static PROC.count    sizeof(u64) end
+static PROC.main_loc sizeof(u64) end
+// STATIC MEMORY
+#define STATIC_MEM_CAP as 516 end // shall be enough i think
+#define ST.name        as 0 +  end // 16
+#define ST.size        as 16 + end // 8
+#define sizeof(ST_MEM) as 24   end
+static STATIC_MEM      sizeof(ST_MEM) STATIC_MEM_CAP * end
+static ST_MEM.count    sizeof(u64)    		       end
+static ST_MEM.offset   sizeof(u64)                     end
+
+// CONST MEMORY
+#define CONST_CAP     as 516   end // shall be enough i think
+#define const.name    as 0 +    end // 16
+#define const.size    as 16 +   end // 24
+#define sizeof(CONST) as 24     end
+static CONST 	      sizeof(CONST) CONST_CAP * end
+static CONST.count    sizeof(u64)   	        end
+static const.offset   sizeof(u64)		end
+// USAGE   \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc usage int -> void do
+  local stream sizeof(u64) end
+  stream swap 64<-
+  "Usage: %s [OPTIONS] input-file-path\n"	stream 64-> fputs
+  "OPTIONS:\n"					stream 64-> fputs
+  "    -h          print this help in stdout\n" stream 64-> fputs
+  "    -o  <path>  provide output path\n"	stream 64-> fputs
+  "    sim <file>  simulate the program\n"	stream 64-> fputs
+  "    com <file>  compile the program\n"	stream 64-> fputs
+end
+// PUSH_OP  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc push_op
+  int // kind
+  int // op
+  ->
+  void
+do
+  // kind op  
+  vr vr.count 64-> sizeof(vr) * + dup
+  // kind  ptr
+  // 	   ptr+8 = int
+  vr.op    rot ptr<-
+  vr.kind swap ptr<-  
+  vr.count inc64 
+end
+// PUSH PROC \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc push_proc str -> void do
+  local proc_name sizeof(str) end
+  proc_name str_assign
+  if proc_name str-> "main" streq do
+    PROC.main_loc   
+    PROC.count 64->
+    ptr<-
+  end
+  PROC
+    PROC.count 64->
+    sizeof(PROC) *
+  +
+  // ptr
+  // -- ptr.name.data = proc_name->data
+  // -- ptr.name.count = proc_name->count
+  
+  dup PROC.name str.data  proc_name str.data  64-> ptr<-
+  dup PROC.name str.count proc_name str.count 64-> ptr<-
+      PROC.pos            PROC.count          64-> ptr<-
+
+      
+  PROC.count inc64
+
+end
+proc is_procedure str -> bool do
+  local p_name sizeof(str) end
+  local exists sizeof(u64) end
+  p_name str_assign
+  exists false bool<-
+  0 while dup PROC.count 64-> < do
+    if
+      dup PROC swap sizeof(PROC) * +
+      PROC.name str-> p_name str-> streq
+    do
+      exists true bool<-
+    end
+    1 + 
+  end drop
+  exists bool-> cast(bool)
+end
+proc get_proc_ptr str -> ptr do
+  local word sizeof(str) end
+  local pos  sizeof(u64) end
+  word str_assign
+
+  0 while dup PROC.count 64-> < do
+    if
+      //  (P+i*SP)
+      dup PROC swap sizeof(PROC) * +
+      PROC.name str-> word str-> streq
+    do
+      dup pos swap ptr<-
+    end    
+    dup pos swap ptr<-
+    1 +
+  end
+  PROC pos 64-> sizeof(PROC) * +
+end
+// STATIC_MEM_PUSH \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc static_mem_push str int -> void do
+  // int ptr SIZE ptr+(ptr->count*sizeof(ptr))
+  STATIC_MEM
+    ST_MEM.count 64->
+    sizeof(ST_MEM) *
+  +
+
+  //   SIZE SIZE dst
+  // [OK]: dst->name.count = int
+  // [OK]: dst->name.data = ptr
+  rot  over ST.name str.data  swap ptr<-
+  rot  over ST.name str.count swap ptr<-
+  over swap ST.size
+    ST_MEM.offset 64->
+    
+  ptr<-
+  // ptr (SIZE+OFFSET)
+  drop
+  // (SIZE + ST_MEM.offset)
+  ST_MEM.offset 64->
+  +
+  ST_MEM.offset swap ptr<-    
+  ST_MEM.count inc64
+
+end
+proc is_static_mem str -> bool
+do
+  local word   sizeof(str) end
+  local exists sizeof(u64) end
+  word str_assign
+  exists false bool<-
+  0 while dup ST_MEM.count 64-> < do
+    // index >>>>
+    // index (ptr+index*size) --- ptr
+    // index ptr
+    if
+      dup STATIC_MEM swap
+      sizeof(ST_MEM) * +
+      ST.name str-> word str-> streq
+    do
+      exists true bool<-
+      
+    end
+    1 +
+  end drop
+  exists 64-> cast(bool)
+
+end
+
+proc static_mem_get_ptr str -> ptr
+do
+  // NOTE: this assume the elements exists
+  local word   sizeof(str) end
+  local pos sizeof(u64) end
+  word str_assign
+  0 while dup ST_MEM.count 64-> < do
+    // index >>>>
+    // index (ptr+index*size) --- ptr
+    // index ptr
+    if
+      dup STATIC_MEM swap
+      sizeof(ST_MEM) * +
+      ST.name str-> word str-> streq
+    do
+     dup pos swap ptr<-      
+    end
+    1 +    
+  end drop
+  STATIC_MEM pos 64-> sizeof(ST_MEM) * +
+
+end
+// PUSH CONST \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc push_const str int -> void
+do
+  local content sizeof(CONST) end
+  content const.size swap ptr<-
+  content const.name str_assign
+
+  CONST
+    CONST.count 64->
+    sizeof(CONST) *
+  +
+  // ptr
+  // ptr = content->size
+  dup const.size content const.size 64-> ptr<-
+  
+  dup const.name str.data  content str.data  64-> ptr<-
+      const.name str.count content str.count 64-> ptr<-
+     
+ 
+  CONST.count inc64
+  "Allocated const: |" puts
+  content const.name str-> puts
+  "|, with the size of: " puts
+  content const.size 64-> itos puts
+  "\n" puts
+  
+
+end
+// CROSS-REFERENCE  \\\\\\\\\\\\\\\\\\\\\\\\\\\
+//static_assert
+//  "TODO: cross_reference_program is not well defined yet. Line:269"
+//  0
+//end
+//#define sizeof(blocks) as sizeof(u64) 124 * end
+//proc cross_reference_program void -> void do
+//  local currentPosition sizeof(u64) end
+//  local currentProcPos  sizeof(u64) end
+//  local blocks          sizeof(blocks) end
+//  currentPosition 0 ptr<-
+//  while currentPosition 64-> vr.count 64-> < do
+//    local cvr sizeof(vr) end
+//    vr currentPosition 64-> sizeof(vr) * +
+//    vr.kind 64->  cvr vr.kind swap ptr<- // cvr.kind = vr[i].kind
+//    vr.op   64->  cvr vr.op   swap ptr<- // cvr.op   = vr[i].op
+//    // push if is if elif else while or do
+//    if cvr vr.kind 64-> OpType::OP_END do
+//      local last_block sizeof(u64) end
+//      last_block blocks drop drop // TODO pop vector
+//      
+//      vr last_block sizeof(vr) * + // vr[last_block]
+//      if dup vr.kind 64-> OpType::OP_DO = do
+//        local before_do sizeof(u64) end
+//	before_do blocks drop drop // TODO pop vector
+//	vr before_do 64-> sizeof(vr) * +
+//	if dup vr.kind 64-> OpType::OP_IF = do
+//	   //src[last_block].head.atomLinkedIndex = currentPosition;
+//	else if dup vr.kind 64-> OpType::OP_WHILE = do
+//	   //src[currentPosition].head.atomLinkedIndex  = before_do + 1; // end
+//	   //src[last_block].head.atomLinkedIndex = currentPosition + 1; // do
+//	end end
+//      else if dup vr.kind 64-> OpType::OP_ELSE = do
+//	   //auto before_do = blocks.back();blocks.pop_back();
+//	   //src[last_block].head.atomLinkedIndex = currentPosition + 1;
+//	   //src[before_do].head.atomLinkedIndex  = last_block + 1;
+//	   //blocks.pop_back();
+//      else
+//        "ERROR: `end` only closes [do, if, while, else]\n" eputs
+//	"  This might be an unclosed `end` block.\n"       eputs
+//	1 exit
+//      end end
+//    end
+//    // ptr
+//    
+//  end
+//  
+//  
+//end
+// LEXER \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+static_assert
+  "Exhaustive handling OpType, please update the lex_file procedure"
+  OpType::OP_COUNT 37 =
+end
+
+
+#define lexer_next as
+  line_content
+  chop_word	  
+  dup  str.count 64-> 
+  word str.count swap ptr<-
+  
+  str.data 64->
+  word str.data swap ptr<-
+
+end
+
+#define loc.file    as 0 +  end // 16
+#define loc.col     as 16 + end // 24
+#define loc.line    as 24 + end // 32
+#define sizeof(loc) as 32   end
+static loc sizeof(loc) 	    end
+proc eputLoc ptr -> void
+do
+  // ptr
+  dup loc.file str->     puts ":" puts
+  dup loc.line 64-> itos puts ":" puts
+      loc.col  64-> itos puts ": " puts
+   
+end
+static file_content sizeof(str) end
+static line_content sizeof(str) end
+static word_content sizeof(str) end
+proc lex_file ptr -> void do
+
+  dup str.count 64-> file_content str.count swap ptr<-
+      str.data  64-> file_content str.data  swap ptr<-
+  while file_content str.count 64-> 0 > do
+     file_content
+     chop_line
+     trim_left     
+     dup str.count 64-> line_content str.count swap ptr<-
+         str.data  64-> line_content str.data  swap ptr<-
+	 
+     while line_content str.count 64-> 0 > do
+           line_content
+          chop_word
+	  local word sizeof(str) end
+	  
+	  dup  str.count 64-> 
+	  word str.count swap ptr<-
+	  
+	  str.data 64->
+	  word str.data swap ptr<-
+	  
+
+	  if word str-> "dump" streq do
+	    OpType::OP_DUMP 0 push_op
+	    
+	  else if word str-> "dup" streq do
+	    OpType::OP_DUP  0 push_op
+	    
+	  else if word str-> "swap" streq do
+	    OpType::OP_SWAP 0 push_op
+
+	  else if word str-> "over" streq do
+	    OpType::OP_OVER  0 push_op
+
+ 	  else if word str-> "drop" streq do
+	    OpType::OP_DROP  0 push_op
+	  //
+	  else if word str-> "rot" streq do
+	    OpType::OP_ROT   0 push_op
+
+	  else if word str-> "divmod" streq do
+	    OpType::OP_DIVMOD 0 push_op
+
+	  else if word str-> "shl" streq do
+	    OpType::OP_SHL    0 push_op
+
+	  else if word str-> "shr" streq do
+	    OpType::OP_SHR    0 push_op
+
+	  else if word str-> "and" streq do
+	    OpType::OP_END          0 push_op
+	    
+	  else if word str-> "or" streq do
+	    OpType::OP_OR          0 push_op
+	    
+	  else if word str-> "not" streq do
+	    OpType::OP_NOT          0 push_op
+	    
+	  else if word str-> "argc" streq do
+	    OpType::OP_ARGC          0 push_op
+	    
+	  else if word str-> "argv" streq do
+	    OpType::OP_ARGV          0 push_op
+	    
+	  else if word str-> "store8" streq do
+	    OpType::OP_STORE8          0 push_op
+	    
+	  else if word str-> "store64" streq do
+	    OpType::OP_STORE64          0 push_op
+	    
+	  else if word str-> "load8" streq do
+	    OpType::OP_LOAD8          0 push_op
+	    
+	  else if word str-> "load64" streq do
+	    OpType::OP_LOAD64          0 push_op
+	    
+	  else if word str-> "mem" streq do
+	    OpType::OP_MEM          0 push_op
+	    
+	  else if word str-> "if" streq do
+	    OpType::OP_IF          0 push_op
+	    
+	  else if word str-> "while" streq do
+	    OpType::OP_WHILE          0 push_op
+	    
+	  else if word str-> "do" streq do
+	    OpType::OP_DO          0 push_op
+	    
+	  else if word str-> "else" streq do
+	    OpType::OP_ELSE          0 push_op
+	    
+	  else if word str-> "end" streq do
+	    OpType::OP_END          0 push_op
+	    	  
+	  else if word str-> "+" streq do
+	    OpType::INTRISIC_PLUS  0 push_op
+
+	  else if word str-> "syscall0" streq do
+	    OpType::INTRISIC_SYSCALL0 0 push_op
+	    
+	  else if word str-> "syscall1" streq do
+	    OpType::INTRISIC_SYSCALL1 0 push_op
+	    
+	  else if word str-> "syscall2" streq do
+	    OpType::INTRISIC_SYSCALL2 0 push_op
+	    
+	  else if word str-> "syscall3" streq do
+	    OpType::INTRISIC_SYSCALL3 0 push_op
+	    
+	  else if word str-> "syscall4" streq do
+	    OpType::INTRISIC_SYSCALL4 0 push_op
+	    
+	  else if word str-> "syscall5" streq do
+	    OpType::INTRISIC_SYSCALL5 0 push_op
+	    
+	  else if word str-> "syscall6" streq do
+	    OpType::INTRISIC_SYSCALL6 0 push_op
+	  
+	  else if word str-> "const"   streq do
+	    lexer_next word str-> // const name
+	    lexer_next
+	    local const_size sizeof(u64) end
+	    10         // TODO: parse int
+	    const_size swap ptr<-
+	    lexer_next
+	    if word str-> "offset" streq do
+	      const_size 64-> const.offset 64-> + const_size swap ptr<-	      
+	      const.offset const_size 64-> ptr<-
+	      lexer_next
+
+	    else if  word str-> "reset" streq do
+	      loc eputLoc
+	      "ERROR: `reset` in constant are not implemented yet\n" eputs
+	      1 exit
+	    else if  word str-> "end" streq do	      
+	    else
+ 	      loc eputLoc	    
+	      "ERROR: expected `end` or `offset` or `reset` after const declaration.\n" eputs
+	      1 exit
+	    end end end
+	    // stack: (int ptr): const name
+	    const_size 64-> 
+	    push_const
+
+	  else if word str-> "static"   streq do
+	    lexer_next word str-> lexer_next
+	    local static_size sizeof(u64) end
+	    10 // TODO: parse int && compiler time eval	    
+	    static_size swap ptr<-
+	    lexer_next
+
+	    if word str-> "reset" streq do
+	      const.offset 64-> static_size 64-> +
+	      static_size swap ptr<-
+	      lexer_next
+
+	    else if word str-> "end"   streq do
+	    else
+	      "ERROR: expected `end` afted static memory declaration,"	eputs
+	      " but got `"						eputs
+	      word str->						eputs
+	      "`.\n"							eputs
+	      1 exit	      
+	    end end
+	    static_size 64->
+	    static_mem_push	    
+
+	   else if word str-> "#include" streq do
+	     "ERROR: `#include` are not implemented yet\n" eputs
+	     1 exit
+	   else if word str-> "proc" streq do
+	   // name ... do end
+	     local proc_name sizeof(str) end
+
+	     lexer_next	     
+	     word str->
+	     proc_name str_assign
+	     
+	     proc_name str-> 
+	     push_proc
+
+	     lexer_next
+
+	     OpType::INTERNAL_SKIP_PROC  0 push_op
+	     OpType::INTERNAL_PROC_ENTRY PROC.count 64-> 1 - push_op
+	     if word str-> "do" streq inot do
+	       "ERROR: expected `do`, but got `"			eputs
+	       word str->						eputs
+	       "`.\n"							eputs
+	       "NOTE: procedure definitions follow this rule:\n"	eputs
+	       "    proc <proc-name> do <proc-body> end\n"		eputs
+	       1 exit
+	     end	     
+	    
+  
+ 	   else if word str-> is_static_mem do	   
+	     OpType::INTRISIC_PUSH_PTR
+	     word str-> static_mem_get_ptr ST.size 64->	     
+	     push_op
+	     
+	   else if word str-> is_procedure do
+	     // FIXME: procedure get_proc_pos
+	     // will compile to the
+	     // enum OpType relative number
+	     OpType::OP_CALL_PROCEDURE
+	     word str-> get_proc_ptr
+	     PROC.pos 64->
+	     push_op
+	     
+	   else
+	     "ERROR: Unreachable identifier at `"	eputs
+   	     word str->					eputs
+             "` in the Parsing stage.\n"		eputs
+	     1 exit
+	   end end end end end end end end end end
+	   end end end end end end end end end end
+	   end end end end end end end end end end
+	   end end end end end end end end // Damn this is so THICC
+     end
+     loc loc.line inc64
+   end
+
+end
+// DUMP  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+proc dump_program void -> void
+do
+  local idx sizeof(u64) end
+
+  "  DUMP vr:\n" puts
+  idx 0 ptr<-
+  "|=================\n" puts	
+  while idx 64-> vr.count 64-> < do
+
+     vr
+     idx 64->
+     sizeof(vr) *
+     +
+     // ptr ptr
+     "| VR->kind = "	puts
+     dup vr.kind 64-> 	dump
+     "| VR->op   = "	puts
+     vr.op       64-> 	dump
+     
+     "--------------\n" puts
+     idx inc64
+  end
+  "|=================\n" puts	
+end
+// COMPILER \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+#define makeLabel as
+  ".L"	fd    64-> fputs  
+  LABEL_COUNT 64->
+  itos	fd    64-> fputs
+  ":\n"	fd    64-> fputs
+  LABEL_COUNT inc64
+end
+static fd sizeof(size_t) end
+static LABEL_COUNT sizeof(u64) end
+
+proc compile_program void -> void do
+  idx 0 ptr<-
+  "BITS 64\n"				fd 64-> fputs
+  "dump:\n"				fd 64-> fputs
+  "  push  rbp\n"			fd 64-> fputs
+  "  mov   rbp, rsp\n"			fd 64-> fputs
+  "  sub   rsp, 64\n"			fd 64-> fputs
+  "  mov   QWORD  [rbp-56], rdi\n"	fd 64-> fputs
+  "  mov   QWORD  [rbp-8], 1\n"		fd 64-> fputs
+  "  mov   eax, 32\n"			fd 64-> fputs
+  "  sub   rax, QWORD  [rbp-8]\n"	fd 64-> fputs
+  "  mov   BYTE  [rbp-48+rax], 10\n"	fd 64-> fputs
+  ".L2:\n"				fd 64-> fputs
+  "  mov   rcx, QWORD  [rbp-56]\n"	fd 64-> fputs
+  "  mov   rdx, -3689348814741910323\n" fd 64-> fputs
+  "  mov   rax, rcx\n"			fd 64-> fputs
+  "  mul   rdx\n"			fd 64-> fputs
+  "  shr   rdx, 3\n"			fd 64-> fputs
+  "  mov   rax, rdx\n"			fd 64-> fputs
+  "  sal   rax, 2\n"			fd 64-> fputs
+  "  add   rax, rdx\n"			fd 64-> fputs
+  "  add   rax, rax\n"			fd 64-> fputs
+  "  sub   rcx, rax\n"			fd 64-> fputs
+  "  mov   rdx, rcx\n"			fd 64-> fputs
+  "  mov   eax, edx\n"			fd 64-> fputs
+  "  lea   edx, [rax+48]\n"		fd 64-> fputs
+  "  mov   eax, 31\n"			fd 64-> fputs
+  "  sub   rax, QWORD  [rbp-8]\n"	fd 64-> fputs
+  "  mov   BYTE  [rbp-48+rax], dl\n"	fd 64-> fputs
+  "  add   QWORD  [rbp-8], 1\n"		fd 64-> fputs
+  "  mov   rax, QWORD  [rbp-56]\n"	fd 64-> fputs
+  "  mov   rdx, -3689348814741910323\n" fd 64-> fputs
+  "  mul   rdx\n"			fd 64-> fputs
+  "  mov   rax, rdx\n"			fd 64-> fputs
+  "  shr   rax, 3\n"			fd 64-> fputs
+  "  mov   QWORD  [rbp-56], rax\n"	fd 64-> fputs
+  "  cmp   QWORD  [rbp-56], 0\n"	fd 64-> fputs
+  "  jne   .L2\n"			fd 64-> fputs
+  "  mov   eax, 32\n"			fd 64-> fputs
+  "  sub   rax, QWORD  [rbp-8]\n"	fd 64-> fputs
+  "  lea   rdx, [rbp-48]\n"		fd 64-> fputs
+  "  lea   rcx, [rdx+rax]\n"		fd 64-> fputs
+  "  mov   rax, QWORD  [rbp-8]\n"	fd 64-> fputs
+  "  mov   rdx, rax\n"			fd 64-> fputs
+  "  mov   rsi, rcx\n"			fd 64-> fputs
+  "  mov   edi, 1\n"			fd 64-> fputs
+  "  mov   rax, 1\n"			fd 64-> fputs
+  "  syscall\n"				fd 64-> fputs
+  "  nop\n"				fd 64-> fputs
+  "  leave\n"				fd 64-> fputs
+  "  ret\n"				fd 64-> fputs
+  "global _start\n"			fd 64-> fputs
+  "segment .text\n"			fd 64-> fputs
+  
+  while idx 64-> vr.count 64-> < do
+     local idx sizeof(u64) end
+     local v   sizeof(vr)  end
+     vr idx 64-> sizeof(vr) * +
+     dup
+     vr.kind 64->  v vr.kind swap ptr<- // v.kind = vr[i].kind
+     vr.op   64->  v vr.op   swap ptr<- // v.op   = vr[i].op
+
+
+  
+
+
+     if		 v vr.kind 64-> OpType::PUSH_INT	= do
+       makeLabel
+
+       "    push "			fd 64-> fputs
+         v vr.op 64->              itos fd 64-> fputs
+         "\n" 	 		   	fd 64-> fputs
+              
+     else if	 v vr.kind 64-> OpType::OP_DUMP		= do
+       makeLabel
+       "   pop rdi\n"			fd 64-> fputs
+       "   call dump\n"			fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_DUP          = do
+       makeLabel
+       "   pop rax\n"			fd 64-> fputs
+       "   push rax\n"			fd 64-> fputs
+       "   push rax\n"			fd 64-> fputs
+	
+     else if     v vr.kind 64-> OpType::OP_SWAP 	= do
+       makeLabel
+       "   pop rax\n"			fd 64-> fputs 
+       "   pop rbx\n"			fd 64-> fputs 
+       "   push rax\n"			fd 64-> fputs
+       "   push rbx\n"			fd 64-> fputs
+	
+     else if     v vr.kind 64-> OpType::OP_OVER 	= do
+       makeLabel
+       "   pop rax\n"			fd 64-> fputs 
+       "   pop rbx\n"			fd 64-> fputs 
+       "   push rbx\n"			fd 64-> fputs
+       "   push rax\n"		 	fd 64-> fputs
+       "   push rbx\n"			fd 64-> fputs
+		
+     else if     v vr.kind 64-> OpType::OP_DROP         = do
+       makeLabel
+       "   pop rax\n"		        fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_ROT         = do
+       makeLabel
+       "   pop rax\n"  			fd 64-> fputs 
+       "   pop rbx\n"  			fd 64-> fputs 
+       "   pop rcx\n"  			fd 64-> fputs                    
+       "   push rbx\n" 			fd 64-> fputs
+       "   push rax\n" 			fd 64-> fputs
+       "   push rcx\n" 			fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::OP_DIVMOD         = do
+       makeLabel
+       "   xor rdx, rdx\n" fd 64-> fputs
+       "   pop rbx\n" fd 64-> fputs 
+       "   pop rax\n" fd 64-> fputs 
+       "   div rbx\n" fd 64-> fputs 
+       "   push rax\n" fd 64-> fputs
+       "   push rdx\n" fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::OP_SHL         = do
+       makeLabel     
+       "   pop rcx\n" fd 64-> fputs   
+       "   pop rbx\n" fd 64-> fputs   
+       "   shl rbx, cl\n" fd 64-> fputs
+       "   push rbx\n" fd 64-> fputs  
+
+
+     else if     v vr.kind 64-> OpType::OP_SHR         = do
+       makeLabel     
+       "   pop rcx\n"     
+       "   pop rbx\n"     
+       "   shr rbx, cl\n" 
+       "   push rbx\n"  
+     else if     v vr.kind 64-> OpType::OP_AND         = do
+       makeLabel     
+       "   pop rax\n" fd 64-> fputs            
+       "   pop rbx\n" fd 64-> fputs            
+       "   and rbx, rax\n" fd 64-> fputs       
+       "   push rbx\n" fd 64-> fputs           
+	  
+     else if     v vr.kind 64-> OpType::OP_OR         = do
+       makeLabel     
+       "   pop rax\n" fd 64-> fputs            
+       "   pop rbx\n" fd 64-> fputs            
+       "   or rbx, rax\n" fd 64-> fputs        
+       "   push rbx\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_NOT         = do
+       makeLabel     
+       "   pop rax\n" fd 64-> fputs            
+       "   not rax\n" fd 64-> fputs            
+       "   push rax\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_ARGC         = do
+       makeLabel     
+       "   mov rax, [args_ptr]\n" fd 64-> fputs
+       "   push rax\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_ARGV         = do
+       makeLabel     
+       "   mov rax, [args_ptr]\n" fd 64-> fputs
+       "   add rax, 8\n" fd 64-> fputs
+       "   push rax\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_STORE8         = do
+       makeLabel     
+       "   pop rbx\n" fd 64-> fputs
+       "   pop rax\n" fd 64-> fputs     
+       "   mov BYTE [rax], bl\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_STORE64         = do
+       makeLabel     
+       "   pop rbx\n" fd 64-> fputs
+       "   pop rax\n" fd 64-> fputs
+       "   mov [rax], rbx\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_LOAD8         = do
+       makeLabel     
+       "   pop rbx\n" fd 64-> fputs
+       "   pop rax\n" fd 64-> fputs
+       "   mov BYTE [rax], bl\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_LOAD64         = do
+       makeLabel     
+       "   pop rbx\n" fd 64-> fputs
+       "   pop rax\n" fd 64-> fputs
+       "   mov [rax], rbx\n" fd 64-> fputs
+       
+     else if     v vr.kind 64-> OpType::OP_MEM         = do
+       makeLabel     
+       "   push buffer\n" fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::OP_IF         = do
+     else if     v vr.kind 64-> OpType::OP_WHILE      = do
+     else if     v vr.kind 64-> OpType::OP_DO         = do
+       makeLabel     
+       "   pop rax\n" fd 64-> fputs
+       "   test rax, rax\n" fd 64-> fputs
+       "   jz L" fd 64-> fputs
+         v vr.op 64-> itos fd 64-> fputs
+	 "\n" fd 64-> fputs
+
+       
+     else if     v vr.kind 64-> OpType::OP_ELSE         = do
+       makeLabel
+       "   jmp L"
+         v vr.op 64-> itos fd 64-> fputs
+	 "\n" fd 64-> fputs
+
+       
+     else if     v vr.kind 64-> OpType::OP_END         = do
+       makeLabel            
+       "   jmp L" fd 64-> fputs
+       v vr.op 64->
+       if dup 0 > do
+         dup itos fd 64-> fputs
+       else
+         LABEL_COUNT 64-> itos fd 64-> fputs
+       end
+       drop
+       "\n" fd 64-> fputs
+
+       
+
+     else if	 v vr.kind 64-> OpType::INTRISIC_PLUS	= do
+       makeLabel     
+       "   pop rbx\n"			fd 64-> fputs
+       "   pop rax\n"			fd 64-> fputs
+       "   add rax, rbx\n"		fd 64-> fputs
+       "   push rax\n"			fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL0 = do
+       makeLabel     
+       "   pop rax\n"		        fd 64-> fputs             
+       "   syscall\n"		        fd 64-> fputs             
+       "   push rax\n"	        	fd 64-> fputs
+	
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL1 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL2 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   pop rsi\n"			fd 64-> fputs             
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs  
+	
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL3 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   pop rsi\n"			fd 64-> fputs             
+       "   pop rdx\n"			fd 64-> fputs             
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs   
+	
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL4 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   pop rsi\n"			fd 64-> fputs             
+       "   pop rdx\n"			fd 64-> fputs             
+       "   pop r10\n"			fd 64-> fputs             
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs  
+	
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL5 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   pop rsi\n"			fd 64-> fputs             
+       "   pop rdx\n"			fd 64-> fputs             
+       "   pop r10\n"			fd 64-> fputs             
+       "   pop r8\n"			fd 64-> fputs              
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs  
+	
+     else if     v vr.kind 64-> OpType::INTRISIC_SYSCALL6 = do
+       makeLabel     
+       "   pop rax\n"			fd 64-> fputs             
+       "   pop rdi\n"			fd 64-> fputs             
+       "   pop rsi\n"			fd 64-> fputs             
+       "   pop rdx\n"			fd 64-> fputs             
+       "   pop r10\n"			fd 64-> fputs             
+       "   pop r8\n"			fd 64-> fputs              
+       "   pop r9\n"			fd 64-> fputs              
+       "   syscall\n"			fd 64-> fputs             
+       "   push rax\n"			fd 64-> fputs
+     else if     v vr.kind 64-> OpType::INTRISIC_PUSH_PTR = do
+       makeLabel     
+       "   mov rax, global_mem\n"	fd 64-> fputs
+       "   add rax, "			fd 64-> fputs
+          v vr.op 64->	 itos           fd 64-> fputs
+	  "\n"				fd 64-> fputs
+       "   push rax\n"			fd 64-> fputs
+
+     else if     v vr.kind 64-> OpType::INTERNAL_SKIP_PROC  = do
+     // NOTE: i think i can `not` use this, i will let it here
+     // till i think it is unecessarily
+     else if     v vr.kind 64-> OpType::INTERNAL_PROC_ENTRY = do
+       makeLabel     
+       ".P"				fd 64-> fputs
+       v vr.op 64-> itos		fd 64-> fputs
+       ":\n"				fd 64-> fputs	    
+       // TODO: local variables "   sub rsp, " << proc_need_allocate[ip->first.op_string] << "\n" 
+       "   mov [ret_stack_rsp], rsp\n"	fd 64-> fputs
+       "   mov rsp, rax\n"		fd 64-> fputs
+	    
+     else if     v vr.kind 64-> OpType::OP_CALL_PROCEDURE  = do
+       makeLabel
+       "   mov rax, rsp\n"		fd 64-> fputs
+       "   mov rsp, [ret_stack_rsp]\n"	fd 64-> fputs
+       "   call P"			fd 64-> fputs
+         v vr.op 64-> itos		fd 64-> fputs
+         "\n"				fd 64-> fputs 
+       "   mov [ret_stack_rsp], rsp\n"	fd 64-> fputs
+       "   mov rsp, rax\n"		fd 64-> fputs
+     
+     else
+	"ERROR: Unreachable vr.kind\n"	puts
+	1 exit     
+     end end end end end end end end end end end end end end end
+     end end end end end end end end end end end end end end
+     end end end end end end end end // damn boy.. this is so THICC
+     
+     idx inc64
+  end
+  if PROC.main_loc 64-> 0 1 - = do
+    "ERROR: the `main` procedure is not declared.\n" eputs
+    1 exit
+  end
+  // TODO: if "main" proc_declared inot do end
+  "_start:\n"				fd 64-> fputs
+  "    mov [args_ptr], rsp\n"		fd 64-> fputs
+  "    mov rax, ret_stack_end\n"	fd 64-> fputs
+  "    mov [ret_stack_rsp], rax\n"	fd 64-> fputs
+  "    call P" fd 64-> fputs    
+    PROC.main_loc 64-> itos
+    fd 64-> fputs
+    "\n"   fd 64-> fputs
+  makeLabel
+  "    mov rax, 60\n"			fd 64-> fputs
+  "    mov rsi, 0\n"			fd 64-> fputs
+  "    syscall\n"			fd 64-> fputs
+
+  "segment .bss\n"	 		fd 64-> fputs
+  "args_ptr:	   resq 1\n"		fd 64-> fputs
+  "ret_stack_rsp:  resq 1\n"		fd 64-> fputs
+  "ret_stack:      resb "		fd 64-> fputs
+    RETURN_STACK_CAP itos		fd 64-> fputs
+    "\n"				fd 64-> fputs
+    
+  "ret_stack_end:  resq 1\n"		fd 64-> fputs
+  "global_mem: resb " 	 		fd 64-> fputs
+    ST_MEM.offset 64-> itos 		fd 64-> fputs
+    "\n" 	    	 		fd 64-> fputs
+end
+proc main do
+  if argc 3 < do
+     stderr usage
+    "ERROR: at ALFA phase you have to provide: \n"	puts
+    "   PROGRAM TARGET OUTPUT\n"			puts
+    1 exit
+  end
+  // PARSE CMD ARGUMENTS \\\\\\\\\\\
+  // LEX FILE \\\\\\\\
+  local fd           sizeof(ptr) end  
+  local file_content sizeof(str) end
+  2 nth_argv cstr-> 
+  loc loc.file str_assign
+  PROC.main_loc 0 1 - ptr<-
+  PROC.count 0 ptr<-
+  2 nth_argv
+  open_file 64->
+  file_content str.data  swap ptr<-
+  file_content str.count swap ptr<-  
+  file_content
+  lex_file
+  dump_program
+  LABEL_COUNT 3 64<- // skip dump label
+  // COMPILER \\\\\\\\\\\  
+  3 nth_argv           
+  get_new_file_stream  // CREATE A FILE AND GET THE FILE DESCRIPTOR
+
+  
+  fd swap ptr<-        // save GLOBAL fb
+  //cross_reference_program
+  compile_program      
+
+end
+

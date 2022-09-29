@@ -1,0 +1,25 @@
+#include "std/std.gfsl"
+// TODO: putu
+#define MAX as 10 end
+static fd     sizeof(size_t)       end	
+static buffer PUTD-BUFFER-CAPACITY end
+
+
+proc main do
+  local i sizeof(size_t) end
+  
+  i 0 store64
+  while i 64-> MAX <= do
+    if i 64-> 2 mod 0 != 
+       i 64-> 3 mod 0 != 
+       and
+
+    do
+      i 64-> dump
+    end    
+    if i 64-> 2 mod 0 = do "Fizz" puts end
+    if i 64-> 3 mod 0 = do "Buzz" puts end
+    "\n" puts
+    i inc64
+  end
+end

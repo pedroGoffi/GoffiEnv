@@ -1,0 +1,12 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 277
+expected	stack : (<integer>, <integer>, <integer>, <pointer>, )
+got		stack : (<integer>, <integer>, <integer>, <pointer>, <integer>, <pointer>, )
+OBS: location is based on macros location, please update the lexer
+4:22: ERROR: blocks are not allowed to change the outside stack
+
+:b stderr 0
+

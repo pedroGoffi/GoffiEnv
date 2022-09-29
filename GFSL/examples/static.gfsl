@@ -1,0 +1,17 @@
+#include "std/std.gfsl"
+
+
+static name sizeof(str) end
+proc main do
+// NOTE string push the size and the ptr to the stack
+// "some string" --- int ptr
+  name str.data "hello"	  swap drop cast(int) 64<-
+  name str.count "hello"       drop cast(int) 64<-
+
+  name str-> puts
+
+  name str.data ", world\n"	  swap drop cast(int) 64<-
+  name str.count ", world\n"           drop cast(int) 64<-  
+  name str-> puts
+
+end

@@ -1,0 +1,10 @@
+#include "std/std.gfsl"
+
+
+proc return_a_string void -> str do
+  "I will return this string\n"
+end
+
+proc main do
+   return_a_string puts
+end

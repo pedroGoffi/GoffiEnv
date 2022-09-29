@@ -1,0 +1,6 @@
+
+proc main(): int {
+  __builtin_exit(1);
+  return 69420;
+}
+

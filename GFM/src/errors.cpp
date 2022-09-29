@@ -1,0 +1,28 @@
+#ifndef __errors__
+#define __errors__
+#include <iostream>
+enum CPUErrors{
+  OK,
+  StackOverflow,
+  StackUnderflow,
+  IlegalInst,
+  IlegalOperand,
+  IlegalMemoryAccess,
+  DivisionByZero,
+  IlegalInstructionAccess,
+};
+const char* CPUErrors_Cstr(CPUErrors err){
+  switch(err){
+  case CPUErrors::OK:				return "OK";
+  case CPUErrors::StackOverflow:		return "Stack overflow";
+  case CPUErrors::StackUnderflow:		return "Stack underflow";
+  case CPUErrors::IlegalInst:			return "Ilegal instruction";
+  case CPUErrors::DivisionByZero:		return "Division by zero";
+  case CPUErrors::IlegalInstructionAccess:      return "Ilegal instruction access";
+  case CPUErrors::IlegalOperand:                return "Ilegal operand";
+  case CPUErrors::IlegalMemoryAccess:		return "Ilegal memory access";
+  default:
+    abort();    
+  }
+}
+#endif /* __errors__ */

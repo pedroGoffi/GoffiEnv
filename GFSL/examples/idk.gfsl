@@ -1,0 +1,16 @@
+#include "std/std.gfsl"
+
+#define puti as
+  itos puts
+end
+proc main do
+  local i sizeof(u64) end
+  i 0 ptr<-
+  while i 64-> 10 < do
+    i 64->      puti
+    " = i\n"    puts
+    // dump(*i)
+    i inc64
+    // i++
+  end
+end

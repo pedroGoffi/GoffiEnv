@@ -1,0 +1,20 @@
+#include "std/std.gfsl"
+
+// static_assert "text" math operation end
+// example
+enum letters
+  A
+  B
+  C
+  LETTER_COUNT
+end
+static_assert "Exhaustive handling letters"   letters::LETTER_COUNT 3 = end  // WILL NOT FAIL
+//static_assert "Exhaustive handling letters" LETTER_COUNT 4 = end  // WILL FAIL AT COMPILER TIME
+
+// OBS: static_assert only works in global top level
+// it will probably segment fault if you try to use it inside anything
+
+proc main do
+  "LETTER COUNT EQUAL 3\n" puts
+
+end

@@ -1,0 +1,8 @@
+#include "std/std.gfsl"
+
+// NOTE: procedures dont handle very well the stack need to fix
+proc main
+do
+  "hello, world\n" puts
+end
+

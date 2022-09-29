@@ -1,0 +1,6 @@
+main:
+  push -1
+  push 34
+  addi
+  native print_i64
+  halt
