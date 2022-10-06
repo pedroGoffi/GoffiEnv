@@ -1,0 +1,43 @@
+var F_0: i64;
+var F_1: i64;
+var F_2: i64;
+var LIMIT: i64;
+
+proc main(): int {
+  LIMIT = 500;
+  F_1 = 1;
+  while F_0 < LIMIT {
+    F_0 = F_1 + F_2;
+    F_1 = F_2;
+    F_2 = F_0;
+    print_i64(F_0);
+  }
+  print_i64(420);
+  LIMIT = 500;
+  F_1 = 1;
+  while F_0 < LIMIT {
+    F_0 = F_1 + F_2;
+    F_1 = F_2;
+    F_2 = F_0;
+    print_i64(F_0);
+  }
+  print_i64(420);
+  LIMIT = 500;
+  F_1 = 1;
+  while F_0 < LIMIT {
+    F_0 = F_1 + F_2;
+    F_1 = F_2;
+    F_2 = F_0;
+    print_i64(F_0);
+  }
+  print_i64(420);
+  LIMIT = 500;
+  F_1 = 1;
+  while F_0 < LIMIT {
+    F_0 = F_1 + F_2;
+    F_1 = F_2;
+    F_2 = F_0;
+    print_i64(F_0);
+  }
+  print_i64(420);
+}

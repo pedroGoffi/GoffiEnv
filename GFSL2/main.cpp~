@@ -1,0 +1,11 @@
+#include <iostream>
+#include <casssert>
+#include "./src/gfsl.cpp"
+
+int main(int argc, char** argv){
+  assert(argc > 2);
+  const char const* program  = argv[0];
+  const char*       input_fp = argv[1];
+  // TODO: check CI
+  
+}

@@ -1,3 +1,0 @@
-var my_var  := 420;     // this var has an `auto` type
-var my_var2 :int = 420; // this is an integer
-var my_var3 :bufHdr = bufHdr;

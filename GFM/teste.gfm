@@ -1,0 +1,9 @@
+#include "std/std.gfm"
+
+
+#string name "hello, world"
+main:
+  push 
+  push 0
+  native write
+  halt

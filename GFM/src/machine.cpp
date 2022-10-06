@@ -8,7 +8,9 @@ TODO: make native call only works with native names nstead of labels and vice ve
 #include "./lexer.cpp"
 #include "../../common/utils.cpp"
 #include "../../common/string.cpp"
+#include <unistd.h>
 
+#define writefd(...) fprintf(fd, __VA_ARGS__)
 #define MACHINE_STACK_CAPACITY		1024
 #define MACHINE_PROGRAM_CAPACITY	1024
 #define LABEL_CAPACITY			1024
@@ -17,7 +19,7 @@ TODO: make native call only works with native names nstead of labels and vice ve
 #define GLOBAL_DEF_CAPACITY             1024
 #define GFM_MAX_INCLUDE_LEVEL           1024
 #define MN_MEMORY_CAPACITY              1024
-
+#define GLOBAL_STRING_CAPACITY          1023
 #define CFLAG_LT   1
 #define CFLAG_LTE  2
 #define CFLAG_EQ   3
@@ -32,10 +34,13 @@ typedef struct Unsolved_Addr Unsolved_Addr;
 typedef struct Native_id Native_id;
 typedef struct Define Define;
 typedef struct Global_Def Global_Def;
+typedef struct Buffer Buffer;;
 typedef union  Word Word;
 typedef int64_t Memory_Addr;
+typedef int64_t Inst_Addr;
 
 typedef CPUErrors (*Machine_native)(Machine*);
+void Buffer_write(Buffer* buffer, void* data, size_t size);
 void Machine_slurp_code_from_file(Machine* mn, const char* fp);
 void Machine_slurp_file_node(Machine* mn, const char* fp);
 union Word{
@@ -74,11 +79,25 @@ int Global_Def_find(Global_Def* df, const char* name){
   }
   return -1;
 }
+
+struct Global_string{
+  const char* var_name;
+  size_t      str_loc;
+  size_t      str_len;
+};
+struct Global_strings{
+  Global_string strs[GLOBAL_STRING_CAPACITY];
+  size_t        strs_size;
+};
+Global_strings global_strings = {};
+
+
 enum InstType{
   Noop,
   Halt,
   Push,
   Dup,
+  Not,
   Swap,
   Addi,  Addf,
   Minusi,Minusf,
@@ -89,13 +108,18 @@ enum InstType{
   Call,
   Ret,
   Cmp,
+  Get_addr,
   Native,
   Load8,
   Load64,
   Store8,
   Store64
 };
-
+struct Buffer{
+  size_t size;
+  size_t capacity;
+  char* data;
+};
 struct Inst{
   InstType type;
   Word     operand;
@@ -115,6 +139,8 @@ struct Machine{
   
   int8_t memory[MN_MEMORY_CAPACITY];
   size_t memory_size;
+
+  Buffer buffer;
 
   int    halt;
   
@@ -142,9 +168,25 @@ struct Natives_Record{
   Natives_Record() = default;
 };
 Natives_Record natives_record = {};
-
+size_t Global_string_push(Machine* mn, const char* id, const char* str){
+  global_strings.strs[global_strings.strs_size++] = {
+    .var_name = id,
+    .str_loc  = mn->buffer.size,
+    .str_len  = strlen(str)
+  };
+  Buffer_write(&mn->buffer, (void*)str, strlen(str));
+  return global_strings.strs_size - 1;
+}
+int Global_string_find(Machine* mn, const char* id){
+  for(size_t i=0; i < global_strings.strs_size; ++i){
+    if(strcmp(global_strings.strs[i].var_name, id) == 0){
+      return i;
+    }
+  }
+  return -1;
+}
 Word Native_Record_find(const char* str){
-  for(size_t i=0; i< natives_record.records_size; i++){
+  for(size_t i=0; i < natives_record.records_size; i++){
     if(strcmp(natives_record.records[i].name.str, str) == 0){
       return Word_i64((int)natives_record.records[i].loc);
     }
@@ -160,7 +202,28 @@ struct Label_Table{
   Label_Table() = default;
 };
 
+void Buffer_resize(Buffer* buffer, size_t new_cap){
+  buffer->capacity = new_cap;  
+  buffer->data     = (char*)realloc(buffer->data, buffer->capacity);
+}
+void Buffer_free(Buffer* buffer){
+  free(buffer->data);
+  buffer->data = NULL;
+  buffer->size = 0;
+  buffer->capacity = 0;
+}
+void Buffer_write(Buffer* buffer, void* data, size_t size){
+  if(buffer->size + size > buffer->capacity){
+    Buffer_resize(buffer, buffer->capacity * 2 + size);
+  }
+  memcpy(buffer->data + buffer->size, data, size);
+  buffer->size += size;
+}
+void Buffer_write_cstr(Buffer* buffer, const char* cstr){
+  Buffer_write(buffer, (void*)cstr, strlen(cstr));
+}
 Label_Table label_table = {};
+static Buffer write_buffer = {};
 Word Label_Table_find(const Label_Table* lt, InternStr str){
   for(size_t i=0; i<lt->labels_size; ++i){
     if(InternStr_eq(lt->labels[i].name, str)){
@@ -181,8 +244,10 @@ void Label_Table_push_unsolved_jmp(Label_Table* lt, Label lb){
   };
   lt->unsolved_addr[lt->unsolved_addr_size++] = unsolved;
 }
-void Machine_push_inst(Machine* mn, Inst inst){
-  mn->program[mn->program_size++] = inst;  
+int Machine_push_inst(Machine* mn, Inst inst){
+  assert(mn->program_size + 1 < MACHINE_PROGRAM_CAPACITY);
+  mn->program[mn->program_size++] = inst;
+  return (int)(mn->program_size - 1);
 }
 
 Word Word_by_token(Machine* mn, Token tk){
@@ -196,6 +261,8 @@ Word Word_by_token(Machine* mn, Token tk){
       return Addr;
     } else if ((Addr = Word_i64(Global_Def_find(&global_def, tk.name))).as.i64 != -1){
       return global_def.defines[Addr.as.i64].value;
+    } else if ((Addr = Word_i64(Global_string_find(mn, tk.name))).as.i64 != -1){
+      return Addr;
     } else {
       printf("WARNING: Unsolved: %s\n", tk.name);
       Label_Table_push_unsolved_jmp(&label_table, {
@@ -213,7 +280,7 @@ Word Word_by_token(Machine* mn, Token tk){
 }
 
 #define dumpf_word(str, wrd)				\
-  fprintf(str, "\t<i64=\t%li,\tf64=\t%f,\tptr=\t%p",	\
+  fprintf(str, "<i64= %li,f64= %f,ptr= %p",		\
 	  (wrd).as.i64,					\
 	  (wrd).as.f64,					\
 	  (wrd).as.ptr					\
@@ -223,6 +290,7 @@ Word Word_by_token(Machine* mn, Token tk){
 const char* InstType_Cstr(InstType type){
   switch(type){
   case InstType::Halt:   return "halt";
+  case InstType::Not:    return "not";
   case InstType::Cmp:    return "cmp";
   case InstType::Push:	 return "push";
   case InstType::Swap:   return "swap";
@@ -234,6 +302,7 @@ const char* InstType_Cstr(InstType type){
   case InstType::Addf:	 return "addf";
   case InstType::Minusf: return "minusf";    
   case InstType::Multf:	 return "multf";
+  case InstType::Get_addr:return "get_addr";
   case InstType::Divf:	 return "divf";
   case InstType::Jmp:	 return "jmp";
   case InstType::Jmp_if: return "jmp_if";
@@ -241,7 +310,10 @@ const char* InstType_Cstr(InstType type){
   case InstType::Call:   return "call";    
   case InstType::Dup:	 return "dup";
   case InstType::Noop:	 return "noop";
-    
+  case InstType::Store8: return "store8";
+  case InstType::Store64:return "store";
+  case InstType::Load8:  return "load8";
+  case InstType::Load64: return "load";
   default:
     abort();
   }
@@ -266,6 +338,8 @@ bool InstType_has_operand(InstType type){
   case InstType::Ret:
   case InstType::Load8:  case InstType::Load64:
   case InstType::Store8: case InstType::Store64:
+  case InstType::Not:
+  case InstType::Get_addr:
     return 0;
   default:
     abort();
@@ -310,6 +384,14 @@ CPUErrors Machine_print_f64(Machine* mn){
   mn->stack_size--;
   return CPUErrors::OK;
 }
+CPUErrors Machine_print_ptr(Machine* mn){
+  if( mn->stack_size < 1){
+    return CPUErrors::StackUnderflow;
+  }
+  printf("%p\n", mn->stack[mn->stack_size - 1].as.ptr);
+  mn->stack_size--;
+  return CPUErrors::OK;
+}
 CPUErrors Machine_exit(Machine* mn){
   if( mn->stack_size < 1){
     return CPUErrors::StackUnderflow;
@@ -318,7 +400,7 @@ CPUErrors Machine_exit(Machine* mn){
   mn->halt = 1;
   return CPUErrors::OK;
 }
-CPUErrors Machine_dump_memory(Machine* mn){
+CPUErrors Machine_print_memory(Machine* mn){
   if( mn->stack_size < 2)
     return CPUErrors::StackUnderflow;
 
@@ -341,7 +423,46 @@ CPUErrors Machine_dump_memory(Machine* mn){
   mn->stack_size -= 2;
   return CPUErrors::OK;
 }
+CPUErrors Machine_write(Machine* mn){
+  if( mn->stack_size < 2)
+    return CPUErrors::StackUnderflow;
 
+  Memory_Addr str_addr    = mn->stack[mn->stack_size - 3].as.i64;
+  int64_t     str_len     = mn->stack[mn->stack_size - 2].as.i64;
+  Memory_Addr file_stream = mn->stack[mn->stack_size - 1].as.i64;
+
+  if(str_addr  >= MN_MEMORY_CAPACITY){
+    return CPUErrors::IlegalMemoryAccess;
+  }
+  if(str_addr + str_len < str_len){
+    return CPUErrors::IlegalMemoryAccess;
+  }
+  if(str_addr + str_len >= MN_MEMORY_CAPACITY){
+    return CPUErrors::IlegalMemoryAccess;
+  }   
+
+  //write(int, const void*, size_t);
+  size_t data_addr = global_strings.strs[str_addr].str_loc;
+  write(file_stream,
+	(const void*)(mn->buffer.data + data_addr),
+	str_len);
+  
+  mn->stack_size -= 3;
+  return CPUErrors::OK;
+}
+CPUErrors Machine_print_stack(Machine* mn){
+  if( mn->stack_size < 1){
+    return CPUErrors::StackUnderflow;
+  }
+  printf("stack:\n");
+  for( size_t i=0; i < mn->stack_size; i++){
+    dump_word(mn->stack[i]);
+    printf("\n");
+  }
+  mn->stack_size -= 2;
+  return CPUErrors::OK;
+  
+}
 void Machine_push_native(Machine* mn, Machine_native native, const char* native_name){
   assert(mn->natives_size < MACHINE_NATIVE_ID_CAPACITY);  
   mn->natives[mn->natives_size] = native;
@@ -355,13 +476,13 @@ void Machine_push_native(Machine* mn, Machine_native native, const char* native_
 void Machine_push_all_natives(Machine* mn){
   Machine_push_native(mn, Machine_alloc,	"alloc");
   Machine_push_native(mn, Machine_free,		"free");
+  Machine_push_native(mn, Machine_exit,		"exit");
+  Machine_push_native(mn, Machine_write,        "write");
   Machine_push_native(mn, Machine_print_i64,	"print_i64");
   Machine_push_native(mn, Machine_print_f64,	"print_f64");
-  Machine_push_native(mn, Machine_exit,		"exit");
-  Machine_push_native(mn, Machine_dump_memory,  "print_memory");
-  
-  
-  
+  Machine_push_native(mn, Machine_print_memory, "print_memory");
+  Machine_push_native(mn, Machine_print_stack,  "print_stack");
+  Machine_push_native(mn, Machine_print_ptr,    "print_ptr");
 }
 CPUErrors Machine_execute(Machine* mn){
   if( mn->ip > mn->program_size) {
@@ -374,6 +495,16 @@ CPUErrors Machine_execute(Machine* mn){
   Inst inst = mn->program[mn->ip];
   switch(inst.type){
   case InstType::Noop:
+    mn->ip++;
+    break;
+  case InstType::Get_addr: {
+    if( mn->stack_size >= MACHINE_STACK_CAPACITY )
+      return CPUErrors::StackOverflow;
+    *(void**)&mn->stack[mn->stack_size - 1].as.i64 = &mn->stack[mn->stack_size - 1].as.ptr;
+    mn->ip++;
+  } break;    
+  case InstType::Not:
+    mn->stack[mn->stack_size - 1].as.i64 = !mn->stack[mn->stack_size - 1].as.i64;
     mn->ip++;
     break;
   case InstType::Halt:
@@ -442,10 +573,9 @@ CPUErrors Machine_execute(Machine* mn){
     }
 
     
-     Word a = mn->stack[mn->stack_size - 1];
-     Word b = mn->stack[mn->stack_size - 2];
-     printf("IsntType::Cmp in beta test.\n");
-   
+     Word a = mn->stack[mn->stack_size - 2];
+     Word b = mn->stack[mn->stack_size - 1];
+
      bool res;
      switch(inst.operand.as.i64){
      case CFLAG_LT:
@@ -502,39 +632,38 @@ CPUErrors Machine_execute(Machine* mn){
     mn->ip = mn->return_stack[--mn->return_stack_size].as.i64;
 
     break;
-    case InstType::Native:
+  case InstType::Native: {
       if( inst.operand.as.i64 >= (int)mn->natives_size){
 	return CPUErrors::IlegalOperand;
       }
-      mn->natives[inst.operand.as.i64](mn);
+      CPUErrors err = mn->natives[inst.operand.as.i64](mn);
       mn->ip++;
-      break;
+      return err;
+  } break;
   case InstType::Load8: {
     if( mn->stack_size < 1)
       return CPUErrors::StackUnderflow;
-    const Memory_Addr addr = mn->stack[mn->stack_size].as.i64;
+    const Memory_Addr addr = mn->stack[mn->stack_size - 1].as.i64;
     if( addr >= MN_MEMORY_CAPACITY ) {
       return CPUErrors::IlegalMemoryAccess;
     }
-    mn->stack[mn->stack_size - 1].as.i64 = (int)mn->memory[addr];
-    mn->stack_size -= 2;
+    mn->stack[mn->stack_size - 1].as.i64 = *(int8_t*)&mn->memory[addr];    
     mn->ip++;
   } break;
   case InstType::Load64: {
     if( mn->stack_size < 1)
       return CPUErrors::StackUnderflow;
-    const Memory_Addr addr = mn->stack[mn->stack_size].as.i64;
+    const Memory_Addr addr = mn->stack[mn->stack_size - 1].as.i64;
     if( addr + 7 >= MN_MEMORY_CAPACITY ) {
       return CPUErrors::IlegalMemoryAccess;
     }
-    mn->stack[mn->stack_size - 1].as.i64 = *(int*)&mn->memory[addr];
-    mn->stack_size -= 2;
+    mn->stack[mn->stack_size - 1].as.i64 = *(int64_t*)&mn->memory[addr];
     mn->ip++;
   } break;    
   case InstType::Store8: {
     if( mn->stack_size < 1)
       return CPUErrors::StackUnderflow;
-    const Memory_Addr addr = mn->stack[mn->stack_size].as.i64;
+    const Memory_Addr addr = mn->stack[mn->stack_size - 2].as.i64;
     if( addr >= MN_MEMORY_CAPACITY ) {
       return CPUErrors::IlegalMemoryAccess;
     }
@@ -543,13 +672,13 @@ CPUErrors Machine_execute(Machine* mn){
     mn->ip++;
   } break;    
   case InstType::Store64: {
-    if( mn->stack_size < 1)
+    if( mn->stack_size < 2)
       return CPUErrors::StackUnderflow;
-    const Memory_Addr addr = mn->stack[mn->stack_size].as.i64;
+    const Memory_Addr addr = mn->stack[mn->stack_size - 2].as.i64;
     if( addr >= MN_MEMORY_CAPACITY ) {
       return CPUErrors::IlegalMemoryAccess;
     }
-    *(int64_t*)&mn->stack[mn->stack_size - 1].as.i64 = *(int64_t*)&mn->memory[addr];
+    *(int64_t*)&mn->memory[addr] = *(int64_t*)&mn->stack[mn->stack_size - 1].as.i64;
     mn->stack_size -= 2;
     mn->ip++;
   } break;        
@@ -587,8 +716,13 @@ void Machine_run(Machine* mn, size_t MAX_INST=0, bool debug=false){
     CPUErrors err = Machine_execute(mn);
     if(err != CPUErrors::OK)
       Machine_abort(err);
-    if(debug)
+    if(debug) {
+
+      printf("-------------------------------\n");
       Machine_dump(mn);
+      printf("-------------------------------\n");
+      sleep(1);
+    }
     //if(mn->halt) break;
   }
 }
@@ -770,6 +904,18 @@ void Machine_translate_line_into_inst(Machine* mn){
       .operand = Word_i64(0)
     };
   }
+  else if (expect_name("push_str")){
+    const Word operand = Word_by_token(mn, consume());    
+    mn->program[mn->program_size++] = {
+      .type    = InstType::Push,
+      .operand = operand
+    };
+    size_t str_len = global_strings.strs[operand.as.i64].str_len;    
+    mn->program[mn->program_size++] = {
+      .type    = InstType::Push,
+      .operand = Word_i64((int)(str_len))
+    };
+  }
   
   else {
     Token unknown = consume();
@@ -803,6 +949,11 @@ void Machine_translate_line_into_inst(Machine* mn){
 	assert(tk.kind == TOKEN_NAME);
 	Word value = Word_by_token(mn, consume());
 	Global_Def_push(&global_def, tk.name, value);
+      } else if (expect_name("string")){
+	Token tk = consume();
+	assert(tk.kind == TOKEN_NAME);
+	const char* str = consume().STRING;
+	Global_string_push(mn, tk.name, str);	
       }
       else {
 	printf("ERROR: unexpected pre-processor instructions: %s\n",
@@ -866,17 +1017,189 @@ void Machine_slurp_code_from_file(Machine* mn, const char* fp){
 }
 
 void Machine_dump_program(FILE* stream, Machine* mn){
-  for(size_t i=0; i< mn->program_size; ++i){
+  for(size_t i=0; i< mn->program_size; ++i){  
     Inst inst = mn->program[i];
     fprintf(stream, "%s ", InstType_Cstr(inst.type));
     if(InstType_has_operand(inst.type))
       dumpf_word_i64(stream, inst.operand);
-    fprintf(stream, "\n");
+    fprintf(stream, "\t\t// inst: %zu \n", i);
   }
 }
 void Machine_decompile_to_file(Machine* mn, const char* outfp){
   FILE* fd = fopen(outfp, "wb");
   assert(fd);
   Machine_dump_program(fd, mn);
+}
+void Machine_compile_to_asmx86_64(Machine* mn, const char* output_fp){
+  FILE* fd = fopen(output_fp, "wb");
+  assert(fd);
+
+  writefd("BITS 64\n");
+  writefd("%%define MACHINE_WORD_SIZE %li\n", sizeof(Word));
+  writefd("segment .text\n");
+  writefd("global _start\n");
+  writefd("print_i64:\n");
+  writefd("\tmov rsi, [stack_top]\n");
+  writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+  writefd("\tmov rax, [rsi]\n");
+  writefd("\tmov [stack_top], rsi\n");
+  writefd("\tmov rdi, 0\n");
+  writefd("\tdec rsp\n");
+  writefd("\tinc rdi\n");
+  writefd("\tmov BYTE [rsp], 10\n");
+
+  writefd(".print_i64_loop:\n");
+  writefd("\txor rdx, rdx\n");
+  writefd("\tmov rbx, 10\n");
+  writefd("\tdiv rbx\n");
+  writefd("\tadd rdx, '0'\n");
+  writefd("\tdec rsp\n");
+  writefd("\tinc rdi\n");
+  writefd("\tmov [rsp], dl\n");
+  writefd("\tcmp rax, 0\n");
+    
+  writefd("\tjne .print_i64_loop\n");  
+  writefd("\tmov rbx, rdi\n");
+  writefd("\tmov rax, 1\n");
+  writefd("\tmov rdi, 1\n");
+  writefd("\tmov rsi, rsp\n");
+  writefd("\tmov rdx, rbx\n");
+  writefd("\tsyscall\n");
+  writefd("\tadd rsp, rbx\n");
+  writefd("\tret\n");
+  
+  writefd("_start:\n");
+#define label_name(position) ".L" position""
+  for(size_t i=0; i < mn->program_size; ++i){
+    Inst inst = mn->program[i];
+    {
+      writefd("L%zu:\n", i);
+      //writefd("\t ;; [%li]: %s operand = ", i, InstType_Cstr(inst.type));
+      //dumpf_word(fd, inst.operand);
+      writefd("\n");
+    }
+    switch(inst.type){
+
+    case InstType::Halt: {
+      writefd("\tmov rax, 60\n");
+      writefd("\tmov rdi, 0\n");
+      writefd("\tsyscall\n");
+    } break;
+    case InstType::Push: {
+      writefd("\tmov rsi, [stack_top]\n");
+      writefd("\tmov QWORD [rsi], %li\n", inst.operand.as.i64);      
+      writefd("\tadd QWORD [stack_top], MACHINE_WORD_SIZE\n");
+    } break;
+    case InstType::Dup: {
+      writefd("\tmov rsi, [stack_top]\n");
+      writefd("\tmov rdi, rsi\n");
+      writefd("\tsub rdi, MACHINE_WORD_SIZE * %li - 1\n", inst.operand.as.i64);
+      writefd("\tmov rax, [rdi]\n");
+      writefd("\tmov [rsi], rax\n");
+      writefd("\tadd rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov [stack_top], rsi\n");
+    } break;
+    case InstType::Swap: {
+      writefd("\tmov rsi, [stack_top]\n");
+      writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov rdi, rsi\n");
+      writefd("\tsub rdi, MACHINE_WORD_SIZE * %li\n", inst.operand.as.i64);
+      writefd("\tmov rax, [rsi]\n");
+      writefd("\tmov rbx, [rdi]\n");
+      writefd("\tmov [rdi], rax\n");
+      writefd("\tmov [rsi], rbx\n");
+    } break;
+    case InstType::Addi: {
+      writefd("\tmov rsi, [stack_top]\n");
+      writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov rbx, [rsi]\n");
+      writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov rax, [rsi]\n");
+      writefd("\tadd rax, rbx\n");
+      writefd("\tmov [rsi], rax\n");
+      writefd("\tadd rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov [stack_top], rsi\n");      
+    } break;
+    case InstType::Jmp: {
+      writefd("\tjmp L%li\n", inst.operand.as.i64);
+    } break;
+    case InstType::Jmp_if: {
+      writefd("\tmov rsi, [stack_top]\n");
+      writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+      writefd("\tmov rax, [rsi]\n");
+      writefd("\tmov rdi, inst_map\n");
+      writefd("\tadd rdi, MACHINE_WORD_SIZE * (%li)\n", inst.operand.as.i64);
+      
+      writefd("\tcmp rax, 0\n");
+      writefd("\tje  JIE%zu\n", i);
+      writefd("\tjmp [rdi]\n");
+      writefd("\tJIE%zu:\n", i);
+    } break;
+    case InstType::Native: {
+      // NOTE: for now the only native is print_i64
+      writefd("\tcall print_i64\n");
+    } break;
+    case InstType::Cmp: {
+      switch(inst.operand.as.i64){
+      case CFLAG_LTE:
+	// rsi = stack.pop();
+	writefd("\tmov rsi, [stack_top]\n");
+	writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+	// rbx = rsi
+	writefd("\tmov rbx, [rsi]\n");
+	// rsi = stack.pop();
+	writefd("\tsub rsi, MACHINE_WORD_SIZE\n");
+	// rax = rsi
+	writefd("\tmov rax, [rsi]\n");
+	// result = 0
+	writefd("\tmov rdx, 0\n");
+	// if ( rax < rbx ) result = 1	
+	writefd("\tcmp rax, rbx\n");
+	writefd("\tjge JIE%zu\n", i);
+	writefd("\tmov rdx, 1\n"); 
+	writefd("JIE%zu:\n", i);
+	// *(int*)&rsi = *(int*)&rdx
+	writefd("\tmov QWORD [rsi], rdx\n");
+	break;
+      default:
+	writefd("\t;; ERROR: unexpected cmp flag\n");
+      }
+    } break;
+    case InstType::Noop: {
+      writefd("\tnop\n");
+    } break;
+    case InstType::Store64:
+    case InstType::Addf: 
+    case InstType::Minusi: 
+    case InstType::Minusf: 
+    case InstType::Multi: 
+    case InstType::Multf: 
+    case InstType::Divi: 
+    case InstType::Divf: 
+    case InstType::Call: 
+    case InstType::Ret: 
+    case InstType::Load8: 
+    case InstType::Load64: 
+    case InstType::Store8:     
+      writefd(";; NOTE The instruction %s is not supported for now\n", InstType_Cstr(inst.type));
+      break;
+    default:
+      writefd("\t;;ERROR: could not translate to asm x86 64 the instructions.\n");
+    }
+  }
+  // writefd("_start:\n");
+  // writefd("\tmov rax, 60\n");
+  // writefd("\tmov rdi, 0\n");
+  // writefd("\tsyscall\n");
+  writefd("segment .data\n");
+  writefd("stack_top: dq stack\n");
+  writefd("inst_map: dq");
+  for(size_t i=0; i < mn->program_size; ++i){
+    writefd(" L%zu,", i);
+  }
+  writefd("\n");
+  writefd("segment .bss\n");
+  writefd("stack: resq %i\n", MACHINE_STACK_CAPACITY);
+  fclose(fd);
 }
 #endif /* __machine__ */

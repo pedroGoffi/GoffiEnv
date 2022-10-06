@@ -10,6 +10,7 @@
 #include "./ast.cpp"
 #include "./token.cpp"
 #include "./grammar.cpp"
+Expr* parse_plus_minus();
 Expr* parse_e0();
 Expr* parse_e1();
 Expr* parse_e2();
@@ -148,11 +149,11 @@ Expr* parse_e1(){
   }
   else if(expect_token(TOKEN_STAR)){
     e->kind      = EXPRKIND_DERREF_NAME;    
-    e->as.derref = parse_e1();
+    e->as.derref = parse_expr();
   }
   else if(expect_token(TOKEN_AMPERSAND)){
     e->kind =  EXPRKIND_ADDROF_NAME;
-    e->as.addr_of = parse_e1();
+    e->as.addr_of = parse_expr();
   }
   else{  
     e = parse_e0();
@@ -163,7 +164,7 @@ Expr* parse_e2(){
   Expr* elhs = new Expr;
   elhs = parse_e1();
   while(is_token(TOKEN_STAR) || is_token(TOKEN_DIV)){
-    char op = (token.kind == TOKEN_STAR)? '*':'/';
+    EXPR_BINARY_OP_KIND op = make_expr_binary_op_kind();
     next_token();
     Expr *erhs = new Expr;
     erhs = parse_e1();
@@ -186,7 +187,7 @@ Expr* parse_plus_minus(){
   Expr* elhs = new Expr;
   elhs = parse_logic();
   while(is_token(TOKEN_PLUS) || is_token(TOKEN_TAKEAWAY)){
-    char op = (token.kind == TOKEN_PLUS)? '+':'-';
+    EXPR_BINARY_OP_KIND op = make_expr_binary_op_kind();
     next_token();
     Expr* erhs = new Expr;
     erhs = parse_logic();
@@ -194,20 +195,25 @@ Expr* parse_plus_minus(){
   }
   return elhs;
 }
+
 Expr* parse_expr(){
   Expr* elhs = new Expr;
   elhs = parse_plus_minus();
-  while(is_token(TOKEN_CMP_EQ) || is_token(TOKEN_CMP_NEQ)){
-    TokenKind op
-      = (token.kind == TOKEN_CMP_EQ)?TOKEN_CMP_EQ:TOKEN_CMP_NEQ;
+  while(is_token(TOKEN_CMP_EQ)
+	|| is_token(TOKEN_CMP_NEQ)
+	|| is_token(TOKEN_LESS)
+	|| is_token(TOKEN_GREATER)
+	){
+    EXPR_CMP_KIND op = make_cmp_kind();
     next_token();    
     
     Expr* erhs = new Expr;
     erhs = parse_plus_minus();
     elhs = expr_make_cmp(elhs, erhs, op);
   }
-  return elhs;
+  return elhs;  
 }
+
 Type* parse_type(){
   Type* type = new Type;
   type->is_const = false;  
@@ -573,7 +579,7 @@ Decl* parse_decl(){
     }
   }
   else {
-    fatal("unexpected token in the global scope\n");
+    fatal("unexpected token in the global scope starts witch: '%c': '%s'\n", *stream, stream);
     exit(1);
   }
 }

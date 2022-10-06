@@ -1,0 +1,15 @@
+var name: *char;
+var stream: i64;
+var strlen: i64;
+var iter: i64;
+
+
+proc main(){
+  strlen = 10;
+  *(name + 0) = 'a';
+  *(name + 1) = 'b';
+  *(name + 2) = 'c';
+  *(name + 3) = 'd';  
+  *name = *__builtin_native__("alloc", strlen);
+  __builtin_native__("print_stack", name, *strlen);
+}

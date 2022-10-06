@@ -1,0 +1,11 @@
+// NOTE: flags for cmp instructions
+#define LT   1
+#define LTE  2
+#define EQ   3
+#define NEQ  4
+#define GTE  5
+#define GT   6
+
+exit:
+  native exit
+  ret

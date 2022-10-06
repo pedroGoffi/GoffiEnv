@@ -7,6 +7,8 @@
 #define LEXER_HAS_LOCATION
 #include "../../common/utils.cpp"
 #include "./token.cpp"
+
+#define STR_CMP(x, y) (strcmp((x), (y)) == 0)
 void init_stream(const char *str);
 int char_to_int(char c);
 char escape_to_char(char c);

@@ -1,0 +1,15 @@
+#ifndef __lexer_gfsl
+#define __lexer_gfsl
+#define not_impl \
+  printf("ERRROR: procedure %s is not implemented yet.\n", __FUNCTION__); \
+  exit(1);
+void next_token();
+const char* stream = nullptr;
+void init_stream(const char* str){
+  stream = str;
+  next_token();
+}
+void next_token(){
+  assert(false)
+}
+#endif /* __lexer_gfsl */

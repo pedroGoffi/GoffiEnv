@@ -1,0 +1,20 @@
+#include "std/std.gfm"
+#define MAX_DIGIT 30
+
+main:
+  push 0
+  push 1
+
+  loop:
+    dup 0
+    native print_i64
+    
+    dup 1
+    dup 1
+    addi
+    
+    dup  0
+    push MAX_DIGIT
+    cmp  LTE
+    jmp_if loop
+  halt

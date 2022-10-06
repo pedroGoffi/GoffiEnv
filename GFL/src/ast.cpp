@@ -47,6 +47,19 @@ typedef enum ExprKind{
   EXPRKIND_FIELD_ACCESS,
   EXPRKIND_ARRAY_ACCESS,
 } ExprKind;
+typedef enum EXPR_BINARY_OP_KIND{
+  OP_KIND_PLUS,
+  OP_KIND_MINUS,
+  
+} EXPR_BINARY_OP_KIND;
+typedef enum EXPR_CMP_KIND {
+  LT  = 1,
+  LTE = 2,
+  EQ  = 3,
+  NEQ = 4,
+  GTE = 5,
+  GT  = 6
+} EXPR_CMP_KIND;
 struct Expr{
   ExprKind kind;
   union{
@@ -55,12 +68,12 @@ struct Expr{
     const char* STRING;
     const char* name;
     struct{
-        char op;
-        Expr* lhs;
-        Expr* rhs;
+      EXPR_BINARY_OP_KIND op;
+      Expr* lhs;
+      Expr* rhs;
     } BinaryOp;
     struct{
-      TokenKind  op;
+      EXPR_CMP_KIND  op;
       Expr* lhs;
       Expr* rhs;
     } comparasion;
@@ -232,7 +245,7 @@ Expr* expr_make_name(Expr* f){
   memcpy(r, f, sizeof(*f));
   return r;
 }
-Expr* expr_make_cmp(Expr* lhs, Expr* rhs, TokenKind op){
+Expr* expr_make_cmp(Expr* lhs, Expr* rhs, EXPR_CMP_KIND op){
   Expr* expr_cmp = new Expr;
   expr_cmp->kind = EXPR_COMPARASION;
   expr_cmp->as.comparasion.op  = op;
@@ -240,7 +253,18 @@ Expr* expr_make_cmp(Expr* lhs, Expr* rhs, TokenKind op){
   expr_cmp->as.comparasion.rhs = rhs;
   return expr_cmp;
 }
-Expr* expr_make_binary(Expr* lhs, Expr* rhs, char op){
+EXPR_BINARY_OP_KIND make_expr_binary_op_kind(){
+  if(is_token(TOKEN_PLUS)) return EXPR_BINARY_OP_KIND::OP_KIND_PLUS;
+  printf("ERROR: undefined binary operation symbol.\n");
+  exit(1);
+}
+EXPR_CMP_KIND make_cmp_kind(){
+  if(is_token(TOKEN_LESS)) return EXPR_CMP_KIND::LT;
+  if(is_token(TOKEN_CMP_EQ))   return EXPR_CMP_KIND::EQ;
+  printf("ERROR: undefined binary comparasion operation symbol.\n");
+  exit(1);
+}
+Expr* expr_make_binary(Expr* lhs, Expr* rhs, EXPR_BINARY_OP_KIND op){
   Expr* expr_bin = new Expr;
   expr_bin->kind		= EXPR_BINARY_OP;
   expr_bin->as.BinaryOp.op	= op;
@@ -261,7 +285,7 @@ void print_expr(Expr* e){
   case EXPR_COMPARASION:
     printf("(cmp [(");
     print_expr(e->as.comparasion.lhs);
-    printf(") %s (", human_readable_token(e->as.comparasion.op));
+    printf(") (TODO: print the comparasion symbol) (");
     print_expr(e->as.comparasion.rhs);
     printf(")])");
     break;

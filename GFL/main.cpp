@@ -5,8 +5,8 @@
 #define LEXER_HAS_LOCATION        
 #include "../common/utils.cpp"
 #include "./src/parser.cpp"
-#include "./src/resolve.cpp"
-
+#include "./src/compiler.cpp"
+#include "../GFM/src/machine.cpp" 
 
 enum CO_OPT{
   NONE,
@@ -18,7 +18,8 @@ enum CO_OPT{
 auto main(int argc, char** argv) -> int {
   const char*  const program = shift(&argc, &argv);
   const char*  input_fp  = argv[0];
-  const char*  output_fp = "out.cpp";
+  const char*  output_fp = "out.asm";
+  bool debug_mode = false;
   // TODO: parse different args
   while(argc){    
     const char* flag = shift(&argc, &argv);
@@ -34,6 +35,8 @@ auto main(int argc, char** argv) -> int {
 	return 1;
       }
       output_fp = shift(&argc, &argv);
+    } else if (is_str(flag, "--debug")){
+      debug_mode = true;
     }
     else {
       input_fp = flag;
@@ -49,15 +52,23 @@ auto main(int argc, char** argv) -> int {
 
   AST_ROOT ast = parser_run_code(entry_content);
   // resolve will type check this stuff and do some automatic stuff
-  resolve_ast(ast);
-  
+ 
 
-  print_ast(ast);
-  printf("------------------\n");
-  //gen_cpp_file_from_ast(ast, output_fp);
-
+  Machine mn = {};
+  mn.program_size = 1;
   
-  return 0;
+  AST_ROOT_Compile(&mn, ast);
   
+  Machine_dump_program(stdout, &mn);
+  //Machine_compile_to_asmx86_64(&mn, output_fp);
+  printf("-------------\n");
+  Machine_run(&mn,
+  	      -1,
+  	      debug_mode);
+  Machine_compile_to_asmx86_64(&mn, output_fp);
+  //print_ast(ast);
+  //printf("------------------\n");
+  
+  return 0;   
 }
 #endif /* __main */

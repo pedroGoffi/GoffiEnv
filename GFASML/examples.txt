@@ -1,3 +1,0 @@
-proc main do
-  push 1
-end

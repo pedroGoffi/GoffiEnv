@@ -1,0 +1,15 @@
+#include "./std/std.gfm"
+#string msg "hello, wolrd"
+#string _error_message "ERROR: could not find the stuff with my stuff seeeeexxxxxxxxxxxx. wa."
+
+#define stdout 1
+
+write_msg:
+  push_str _error_message
+  push stdout	
+  native write
+  ret
+
+main:
+  call write_msg
+  halt

@@ -2,12 +2,15 @@
 #include "./src/machine.cpp"
 #include "./src/errors.cpp"
 #include "../common/utils.cpp"
+
+#if 1
 #define STD_AUTO_INST_LIMIT ARRAY_SIZE(mn.program)
 #define STD_OUT_FP     "a.gfm"
 enum Compiler_mode{
   undefined = 0,
   run_bytecode,
   compile_into_bytecode,
+  compile_into_asmx86_64,
   translate_bytecode_to_ascii,
   decompiler
 };
@@ -49,6 +52,8 @@ int main(int argc, char** argv){
       compiler_mode = Compiler_mode::translate_bytecode_to_ascii;
     } else if (strcmp(flag, "-d") == 0){
       compiler_mode = Compiler_mode::decompiler;
+    } else if (strcmp(flag, "--asm") == 0){
+      compiler_mode = Compiler_mode::compile_into_asmx86_64;
     } else {
       input_fp = flag;
     }
@@ -83,7 +88,22 @@ int main(int argc, char** argv){
   case Compiler_mode::run_bytecode:
     Machine_load_program_from_file(&mn, input_fp);
     break;
-
+  case Compiler_mode::compile_into_asmx86_64: {
+    Machine_slurp_code_from_file(&mn, input_fp);
+    Machine_compile_to_asmx86_64(&mn, output_fp);
+    char buffer[256];
+#define CMD(...)						\
+    sprintf(buffer, __VA_ARGS__);				\
+    printf("CMD: %s\n", buffer);					\
+    system(buffer);
+    //
+    //CMD("rm %s", output_fp);
+    CMD("nasm -felf64 %s -o a.o", output_fp);
+    CMD("ld a.o -o %s", "g.bin");
+    CMD("rm a.o");
+#undef CMD
+    return 0;
+  } break;
   case Compiler_mode::undefined: 
   default:
     Machine_slurp_code_from_file(&mn, input_fp);
@@ -94,3 +114,12 @@ int main(int argc, char** argv){
       
   Machine_run(&mn, inst_limit, debug_mode);
 }
+#else
+int main(){
+  Buffer buffer = {};
+  Buffer_write_cstr(&buffer, "hello");
+  Buffer_write_cstr(&buffer, "world");
+  Buffer_free(&buffer);
+  
+}
+#endif
