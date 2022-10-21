@@ -1,0 +1,17 @@
+static program   16 end
+static input_fp  16 end
+static output_fp 16 end
+// GFSL
+macro vr-program end
+macro vr-program_size 16384 + end
+static vr 16392 end
+
+import "std/std.gfsl"
+import "gfsl/compiler.gfsl"
+proc main {
+  output_fp "out.asm"   str!
+  input_fp  "test.gfsl" str!
+
+  compiler_test
+}
+

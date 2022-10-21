@@ -1,0 +1,17 @@
+import "std/std.gfsl"
+
+proc strlen
+{
+  local sa 8 end
+  "UNIMPLEMENTED strlen\n" eputs
+  1 exit
+}
+proc streq
+{
+  local sa 8 end
+  local sb 8 end
+  // sa sb SB
+  sb swap store
+  sa swap store
+  sb strlen dump
+}

@@ -4,5 +4,6 @@
 proc main
 do
   "hello, world\n" puts
+
 end
 

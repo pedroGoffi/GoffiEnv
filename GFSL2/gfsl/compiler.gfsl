@@ -1,0 +1,13 @@
+macro  OPTYPE_PUSH_INST 1 end
+macro  inst-type    end
+macro  inst-operand 8 + end
+static inst 16 end
+
+macro putln  puts "__" puts 10 dump end
+
+proc compiler_test{
+  "TODO: compiler_test\n"      putln 
+  "TODO: make compare symbols" putln
+  
+  1 exit
+}

@@ -1,0 +1,14 @@
+proc fact
+// int 
+{
+  local n    8 end
+  local iter 8 end  
+  n swap store
+  iter 1 store
+  while n load do
+    iter load n load * iter swap store
+    n load 1 - n swap store
+
+  end
+  iter load 
+}

@@ -1,0 +1,11 @@
+import "std/std.gfsl"
+
+
+macro  strukt-age  0 end // 8
+macro  strukt-name 8 end // 16
+static strutk 16 end
+proc main do
+  strukt strukt-age  ptr+ 10 store
+  // [strutk + offset(struck.age)] = 10
+  strukt strukt-name "hello" str!
+end

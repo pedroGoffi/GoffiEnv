@@ -1,0 +1,18 @@
+import "std/std.gfsl"
+macro ptr* load end
+
+static global 8 end // global mem
+
+proc ?is-space do
+  local foo 8 end
+  // *ptr
+  dup ptr* 1 + foo swap store
+  foo
+end
+
+proc main do
+  local foo 8 end
+  foo 8 store
+  foo ?is-space load store
+  foo load dump
+end

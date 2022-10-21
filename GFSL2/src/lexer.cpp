@@ -8,7 +8,6 @@
 #include "../../common/utils.cpp"
 #include "./token.cpp"
 
-#define STR_CMP(x, y) (strcmp((x), (y)) == 0)
 void init_stream(const char *str);
 int char_to_int(char c);
 char escape_to_char(char c);
@@ -201,6 +200,7 @@ void next_token(){
     stream++;
     goto __next_token;
     break;
+  case '?': 
   case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': 
   case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p': 
   case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x': 
@@ -208,7 +208,7 @@ void next_token(){
   case 'G': case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N': 
   case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U': case 'V':
   case 'W': case 'X': case 'Y': case 'Z': case '_':
-    while(std::isalnum(*stream) || *stream == '_' ){
+    while(std::isalnum(*stream) || *stream == '_'  || *stream == '-' || *stream == '!' || *stream == '@' || *stream == '*' || *stream == '?'){
       stream++;
     }
     token.kind		= TokenKind::TOKEN_NAME;
@@ -247,6 +247,7 @@ void next_token(){
 #define kind1(k, r)				\
     case k:					\
       token.kind = r;				\
+      token.name = #k;				\
       stream++;					\
       break;
     // ------------------------------
@@ -263,7 +264,6 @@ void next_token(){
     kind1(';',  TOKEN_DOT_AND_COMMA);
     kind1('<',  TOKEN_LESS);
     kind1('>',  TOKEN_GREATER);
-    kind1('?',  TOKEN_QUESTION_MARK);
     kind1('(',  TOKEN_OPEN_R_PAREN);
     kind1(')',  TOKEN_CLOSE_R_PAREN);
     kind1('{',  TOKEN_OPEN_C_PAREN);

@@ -1,0 +1,7 @@
+import "std/std.gfsl"
+
+proc main
+{
+  while 0 do
+  end
+}

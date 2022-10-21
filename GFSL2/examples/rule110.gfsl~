@@ -1,0 +1,11 @@
+import "std/std.gfsl"
+macro ROW_LENGTH 30 end
+macro ROW_HEIGHT ROW_LENGTH 2 + end
+
+proc main
+{
+  0 while dup do
+    local x 8 end
+    x 
+  end
+}

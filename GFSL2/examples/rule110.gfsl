@@ -1,0 +1,8 @@
+import "std/std.gfsl"
+import "std/file.gfsl"
+
+
+proc main
+{
+  1 nth-argv cat
+}

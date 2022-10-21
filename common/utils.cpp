@@ -4,10 +4,15 @@
 #include <cstdarg>
 #include <cassert>
 #include <string.h>
+
+#define printf_buffer stdout
+#undef  printf
+#define printf(...) fprintf(printf_buffer, __VA_ARGS__)
+
 #define ARRAY_SIZE(xs) (sizeof(xs) / sizeof((xs)[0]))
 
 #define error_here(...)							\
-  fprintf(stderr, "[%s:: %s] :: error here: ", __FILE__, __FUNCTION__);	\
+  fprintf(stderr, "[%s:: %s] :: error: ", __FILE__, __FUNCTION__);	\
   fprintf(stderr, __VA_ARGS__);						\
   fprintf(stderr, "\n");						\
   abort();
@@ -38,7 +43,7 @@ inline auto shift(int *argc, char***argv) -> const char* {
 typedef struct BufHdr{
   size_t len;
   size_t cap;
-  char buf[0];
+  char   buf[1]; // NOTE: if the allocator buggy, change the array size to zero  
 } BufHdr;
 
 #define BUF_SIZE_MAX 1024*1024
@@ -139,7 +144,9 @@ void syntax_error(const char* fmt, ...){
 }
 #endif
 
-
+size_t test_ok_lvl = 0;
+#define TEST_OK printf("TEST %zu: OK AT %s\n", ++test_ok_lvl, __FUNCTION__);
+#define STR_CMP(a, b) (strcmp((a), (b)) == 0)
 #endif /* __util */
 
 

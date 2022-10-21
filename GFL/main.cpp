@@ -1,3 +1,4 @@
+// TODO: make cached types in ast
 #ifndef __main
 #define __main
 #include <iostream>
@@ -5,20 +6,27 @@
 #define LEXER_HAS_LOCATION        
 #include "../common/utils.cpp"
 #include "./src/parser.cpp"
+#include "./src/ordering.cpp"
+#include "./src/cpp_dump.cpp"
 #include "./src/compiler.cpp"
 #include "../GFM/src/machine.cpp" 
+
 
 enum CO_OPT{
   NONE,
   DUMP_AST,  
   GENERATE_C_CODE,
   GENERATE_ASM_CODE,
+  SIMULATE_GFM,
 };
 
-auto main(int argc, char** argv) -> int {
+int main(int argc, char** argv){
+  assembler_test();
+  exit(1);
   const char*  const program = shift(&argc, &argv);
   const char*  input_fp  = argv[0];
-  const char*  output_fp = "out.asm";
+  const char*  output_fp = "out.cpp";
+  enum CO_OPT compiler_mode = CO_OPT::SIMULATE_GFM;
   bool debug_mode = false;
   // TODO: parse different args
   while(argc){    
@@ -37,7 +45,9 @@ auto main(int argc, char** argv) -> int {
       output_fp = shift(&argc, &argv);
     } else if (is_str(flag, "--debug")){
       debug_mode = true;
-    }
+    } else if (is_str(flag, "-gen:c")){
+      compiler_mode = CO_OPT::GENERATE_C_CODE;
+    } 
     else {
       input_fp = flag;
     }
@@ -49,26 +59,15 @@ auto main(int argc, char** argv) -> int {
     printf("error: could not open the file: `%s`\n", input_fp);
     return 1;
   }
+  
+  AST_ROOT first_ast   = parser_run_code(entry_content);
+  AST_ROOT ordered_ast = order_ast(first_ast);
 
-  AST_ROOT ast = parser_run_code(entry_content);
-  // resolve will type check this stuff and do some automatic stuff
- 
+  buf__free(first_ast);
 
-  Machine mn = {};
-  mn.program_size = 1;
-  
-  AST_ROOT_Compile(&mn, ast);
-  
-  Machine_dump_program(stdout, &mn);
-  //Machine_compile_to_asmx86_64(&mn, output_fp);
-  printf("-------------\n");
-  Machine_run(&mn,
-  	      -1,
-  	      debug_mode);
-  Machine_compile_to_asmx86_64(&mn, output_fp);
-  //print_ast(ast);
-  //printf("------------------\n");
-  
+  print_ast(ordered_ast);
+  (void) compiler_mode;
+  (void) debug_mode;
   return 0;   
 }
 #endif /* __main */

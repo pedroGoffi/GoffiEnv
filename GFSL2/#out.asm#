@@ -1,0 +1,441 @@
+BITS 64
+dump:
+	push  rbp
+	mov   rbp, rsp
+	sub   rsp, 64
+	mov   QWORD  [rbp-56], rdi
+	mov   QWORD  [rbp-8], 1
+	mov   eax, 32
+	sub   rax, QWORD  [rbp-8]
+	mov   BYTE  [rbp-48+rax], 10
+.L0:
+	mov   rcx, QWORD  [rbp-56]
+	mov   rdx, -3689348814741910323
+	mov   rax, rcx
+	mul   rdx
+	shr   rdx, 3
+	mov   rax, rdx
+	sal   rax, 2
+	add   rax, rdx
+	add   rax, rax
+	sub   rcx, rax
+	mov   rdx, rcx
+	mov   eax, edx
+	lea   edx, [rax+48]
+	mov   eax, 31
+	sub   rax, QWORD  [rbp-8]
+	mov   BYTE  [rbp-48+rax], dl
+	add   QWORD  [rbp-8], 1
+	mov   rax, QWORD  [rbp-56]
+	mov   rdx, -3689348814741910323
+	mul   rdx
+	mov   rax, rdx
+	shr   rax, 3
+	mov   QWORD  [rbp-56], rax
+	cmp   QWORD  [rbp-56], 0
+	jne   .L0
+	mov   eax, 32
+	sub   rax, QWORD  [rbp-8]
+	lea   rdx, [rbp-48]
+	lea   rcx, [rdx+rax]
+	mov   rax, QWORD  [rbp-8]
+	mov   rdx, rax
+	mov   rsi, rcx
+	mov   edi, 1
+	mov   rax, 1
+	syscall
+	nop
+	leave
+	ret
+global _start
+segment .text
+P4: ;; Procedure 'str!'
+	sub rsp, 129
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L1:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 0]
+	mov rax, [ret_stack_rsp]
+	add rax, 0
+	push rax
+L2:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 339]
+	;;START MACRO: rstore, of length: 2
+L2:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+L3:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+	;;END MACRO: rstore
+L5:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 65]
+	mov rax, [ret_stack_rsp]
+	add rax, 65
+	push rax
+L6:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 339]
+	;;START MACRO: rstore, of length: 2
+L6:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+L7:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+	;;END MACRO: rstore
+L9:	;; [INFO]: (INST)[type = DUP, operand = 0]
+	pop rax
+	push rax
+	push rax
+L10:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 342]
+	;;START MACRO: str-len, of length: 2
+L10:	;; [INFO]: (INST)[type = PUSH_INT, operand = 0]
+	push 0
+L11:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: str-len
+L13:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 65]
+	mov rax, [ret_stack_rsp]
+	add rax, 65
+	push rax
+L14:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L15:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+L16:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 343]
+	;;START MACRO: str-data, of length: 2
+L16:	;; [INFO]: (INST)[type = PUSH_INT, operand = 8]
+	push 8
+L17:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: str-data
+L19:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 0]
+	mov rax, [ret_stack_rsp]
+	add rax, 0
+	push rax
+L20:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L21:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	add rsp, 129
+	ret
+P5: ;; Procedure 'str*'
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L22:	;; [INFO]: (INST)[type = DUP, operand = 0]
+	pop rax
+	push rax
+	push rax
+L23:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 342]
+	;;START MACRO: str-len, of length: 2
+L23:	;; [INFO]: (INST)[type = PUSH_INT, operand = 0]
+	push 0
+L24:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: str-len
+L26:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L27:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+L28:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 343]
+	;;START MACRO: str-data, of length: 2
+L28:	;; [INFO]: (INST)[type = PUSH_INT, operand = 8]
+	push 8
+L29:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: str-data
+L31:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	ret
+P6: ;; Procedure 'str-eq'
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L32:	;; [INFO]: (INST)[type = PUSH_STR, operand = 0]
+	push 36
+	push STR0
+L33:	;; [INFO]: (INST)[type = CALL_PROC, operand = 1]
+	;;start of inline procedure eputs
+L33:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 2]
+	;;START MACRO: stderr, of length: 1
+L33:	;; [INFO]: (INST)[type = PUSH_INT, operand = 2]
+	push 2
+	;;END MACRO: stderr
+L35:	;; [INFO]: (INST)[type = CALL_PROC, operand = 0]
+	;;start of inline procedure fputs
+L35:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 331]
+	;;START MACRO: write, of length: 2
+L35:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 17]
+	;;START MACRO: SYS_write, of length: 1
+L35:	;; [INFO]: (INST)[type = PUSH_INT, operand = 1]
+	push 1
+	;;END MACRO: SYS_write
+L37:	;; [INFO]: (INST)[type = SYSCALL3, operand = 0]
+	pop rax
+	pop rdi
+	pop rsi
+	pop rdx
+	syscall
+	push rax
+	;;END MACRO: write
+	;;end of inline procedure fputs
+	;;end of inline procedure eputs
+L41:	;; [INFO]: (INST)[type = PUSH_INT, operand = 1]
+	push 1
+L42:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 336]
+	;;START MACRO: exit, of length: 2
+L42:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 76]
+	;;START MACRO: SYS_exit, of length: 1
+L42:	;; [INFO]: (INST)[type = PUSH_INT, operand = 60]
+	push 60
+	;;END MACRO: SYS_exit
+L44:	;; [INFO]: (INST)[type = SYSCALL1, operand = 0]
+	pop rax
+	pop rdi
+	syscall
+	push rax
+	;;END MACRO: exit
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	ret
+P8: ;; Procedure 'get-file-text'
+	sub rsp, 170
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L46:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L47:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 162]
+	mov rax, [ret_stack_rsp]
+	add rax, 162
+	push rax
+L48:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+L49:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+L50:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 17]
+	mov rax, [ret_stack_rsp]
+	add rax, 17
+	push rax
+L51:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 162]
+	mov rax, [ret_stack_rsp]
+	add rax, 162
+	push rax
+L52:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L53:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 334]
+	;;START MACRO: fstat, of length: 2
+L53:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 21]
+	;;START MACRO: SYS_fstat, of length: 1
+L53:	;; [INFO]: (INST)[type = PUSH_INT, operand = 5]
+	push 5
+	;;END MACRO: SYS_fstat
+L55:	;; [INFO]: (INST)[type = SYSCALL2, operand = 0]
+	pop rax
+	pop rdi
+	pop rsi
+	syscall
+	push rax
+	;;END MACRO: fstat
+L57:	;; [INFO]: (INST)[type = DROP, operand = 0]
+	pop rax
+L58:	;; [INFO]: (INST)[type = PUSH_INT, operand = 0]
+	push 0
+L59:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 162]
+	mov rax, [ret_stack_rsp]
+	add rax, 162
+	push rax
+L60:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L61:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 12]
+	;;START MACRO: MAP_PRIVATE, of length: 1
+L61:	;; [INFO]: (INST)[type = PUSH_INT, operand = 2]
+	push 2
+	;;END MACRO: MAP_PRIVATE
+L63:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 13]
+	;;START MACRO: PROT_READ, of length: 1
+L63:	;; [INFO]: (INST)[type = PUSH_INT, operand = 1]
+	push 1
+	;;END MACRO: PROT_READ
+L65:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 17]
+	mov rax, [ret_stack_rsp]
+	add rax, 17
+	push rax
+L66:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 352]
+	;;START MACRO: stat-st_size, of length: 2
+L66:	;; [INFO]: (INST)[type = PUSH_INT, operand = 48]
+	push 48
+L67:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: stat-st_size
+L69:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L70:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 3]
+	;;START MACRO: NULL, of length: 1
+L70:	;; [INFO]: (INST)[type = PUSH_INT, operand = 0]
+	push 0
+	;;END MACRO: NULL
+L72:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 337]
+	;;START MACRO: mmap, of length: 2
+L72:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 25]
+	;;START MACRO: SYS_mmap, of length: 1
+L72:	;; [INFO]: (INST)[type = PUSH_INT, operand = 9]
+	push 9
+	;;END MACRO: SYS_mmap
+L74:	;; [INFO]: (INST)[type = SYSCALL6, operand = 0]
+	pop rax
+	pop rdi
+	pop rsi
+	pop rdx
+	pop r10
+	pop r8
+	pop r9
+	syscall
+	push rax
+	;;END MACRO: mmap
+L76:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 17]
+	mov rax, [ret_stack_rsp]
+	add rax, 17
+	push rax
+L77:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 352]
+	;;START MACRO: stat-st_size, of length: 2
+L77:	;; [INFO]: (INST)[type = PUSH_INT, operand = 48]
+	push 48
+L78:	;; [INFO]: (INST)[type = PLUS, operand = 0]
+	pop rbx
+	pop rax
+	add rax, rbx
+	push rax
+	;;END MACRO: stat-st_size
+L80:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L81:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	add rsp, 170
+	ret
+P9: ;; Procedure 'strlen'
+	sub rsp, 8
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L82:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 0]
+	mov rax, [ret_stack_rsp]
+	add rax, 0
+	push rax
+L83:	;; [INFO]: (INST)[type = EXTEND_MACRO, operand = 339]
+	;;START MACRO: rstore, of length: 2
+L83:	;; [INFO]: (INST)[type = SWAP, operand = 0]
+	pop rax
+	pop rbx
+	push rax
+	push rbx
+L84:	;; [INFO]: (INST)[type = STORE64, operand = 0]
+	pop rbx
+	pop rax
+	mov [rax], rbx
+	;;END MACRO: rstore
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	add rsp, 8
+	ret
+P10: ;; Procedure 'main'
+	sub rsp, 8
+	mov [ret_stack_rsp], rsp
+	mov rsp, rax
+L86:	;; [INFO]: (INST)[type = WHILE, operand = 0]
+L87:	;; [INFO]: (INST)[type = PUSH_LOCAL_PTR, operand = 0]
+	mov rax, [ret_stack_rsp]
+	add rax, 0
+	push rax
+L88:	;; [INFO]: (INST)[type = LOAD64, operand = 0]
+	pop rax
+	xor rbx, rbx
+	mov rbx, [rax]
+	push rbx
+L89:	;; [INFO]: (INST)[type = DO, operand = 0]
+	pop rax
+	test rax, rax
+	jz L0
+L90:	;; [INFO]: (INST)[type = END, operand = 0]
+	jmp L91
+	mov rax, rsp
+	mov rsp, [ret_stack_rsp]
+	add rsp, 8
+	ret
+_start:
+	mov [args_ptr], rsp
+	mov rax, ret_stack_end
+	mov [ret_stack_rsp], rax
+	call P10
+	mov rdi, 0
+	mov rax, 60
+	syscall
+segment .data
+STR0: db "ERROR: str-eq is not implemented yet", 0
+segment .bss
+args_ptr: resq 1 
+ret_stack_rsp: resq 1 
+ret_stack: resb 4096
+ret_stack_end: resq 1 

@@ -1,0 +1,12 @@
+import "std/std.gfsl"
+import "std/string.gfsl"
+import "std/math.gfsl"
+
+proc main
+{
+  local Str_a 8 end
+  local Str_b 8 end
+  Str_a "hello, world" swap drop store
+  Str_b "hello, world" swap drop store
+  Str_a Str_b streq
+}

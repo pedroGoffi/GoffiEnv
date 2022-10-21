@@ -1,0 +1,8 @@
+import "std/std.gfsl"
+
+
+static global 8 end // global mem
+proc ?is-space do end
+
+proc main do
+end

@@ -1,0 +1,51 @@
+import "./std/core.gfsl"
+
+inline proc fputs { write }
+inline proc eputs { stderr fputs }
+inline proc puts  { stdout fputs }
+inline proc exit  { SYS_exit syscall1 }
+
+// INTRISIC HELPERS
+macro nth-argv
+  8 * argv + 
+end
+// POINTER ARITHMETRIC
+macro rstore swap store end 
+macro ptr* load end
+macro ptr+ +    end
+
+// STRING LOGIC
+macro str-len  0 + end
+macro str-data 8 + end
+macro str-size 16  end
+// Sizeof(str) 16
+// str! save a string to a pointer
+proc str!
+// ptr -- destination
+// int -- str-size
+// ptr -- str-pointer
+{
+  // ptr int str
+  local Data 64 end
+  local Len  64 end
+  // dst int str
+
+  Data rstore
+  Len  rstore
+
+  dup str-len  Len  load store
+      str-data Data load store
+}
+// str* derref a pointer std based string
+proc str*
+ // ptr -- std-string
+ 
+{
+  dup str-len  load swap
+      str-data load
+}
+proc str-eq {
+  "ERROR: str-eq is not implemented yet\n" eputs
+  1 exit
+}
+import "./std/file.gfsl"

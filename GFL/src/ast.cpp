@@ -3,6 +3,7 @@
 #define __ast
 #include <iostream>
 #include <cassert>
+#include <map>
 #include "./token.cpp"
 #include "../../common/utils.cpp"
 
@@ -11,6 +12,7 @@ typedef struct StmtList StmtList;
 typedef struct Var Var;
 typedef struct Proc Proc;
 typedef struct Type Type;
+typedef struct TypeField TypeField;
 typedef struct switchList switchList;
 typedef struct Expr Expr;
 typedef struct _FieldAccess _FieldAccess;
@@ -27,6 +29,7 @@ void __ident(){
   }						
     
 }
+const char* human_type(Type* type);
 void print_typespec(TypeSpec* t);
 void print_type(Type* t);
 void print_stmt_list(StmtList* b);
@@ -49,9 +52,19 @@ typedef enum ExprKind{
 } ExprKind;
 typedef enum EXPR_BINARY_OP_KIND{
   OP_KIND_PLUS,
-  OP_KIND_MINUS,
-  
+  OP_KIND_MINUS,  
 } EXPR_BINARY_OP_KIND;
+
+const char* human_expr_binary_op_kind(EXPR_BINARY_OP_KIND kind){
+  switch(kind){
+  case EXPR_BINARY_OP_KIND::OP_KIND_PLUS:  return "+";
+  case EXPR_BINARY_OP_KIND::OP_KIND_MINUS: return "-";
+  default:
+    printf("ERROR: undefined kind at human_expr_binary_op_kind.\n");
+    exit(1);
+    break;
+  }
+}
 typedef enum EXPR_CMP_KIND {
   LT  = 1,
   LTE = 2,
@@ -60,13 +73,28 @@ typedef enum EXPR_CMP_KIND {
   GTE = 5,
   GT  = 6
 } EXPR_CMP_KIND;
+const char* human_expr_cmp_kind(EXPR_CMP_KIND kind){
+  switch(kind){
+  case EXPR_CMP_KIND::LT:	return "<";
+  case EXPR_CMP_KIND::LTE:	return "<=";
+  case EXPR_CMP_KIND::EQ:	return "==";
+  case EXPR_CMP_KIND::NEQ:	return "!=";
+  case EXPR_CMP_KIND::GTE:	return ">=";
+  case EXPR_CMP_KIND::GT:	return ">";
+  default:
+    printf("ERROR: undefined kind at human_expr_cmp_kind.\n");
+    exit(1);
+    break;
+    
+  }
+}
 struct Expr{
   ExprKind kind;
+  const char* name;
   union{
     int    INT;
     double FLOAT;
     const char* STRING;
-    const char* name;
     struct{
       EXPR_BINARY_OP_KIND op;
       Expr* lhs;
@@ -145,10 +173,9 @@ struct Stmt{
   } as;
 };
 struct Var{
-  const char* name;
-  Type* type;
-  Expr* expr;
-} ;
+  TypeField* type_field;
+  Expr*      expr;
+};
 struct switchList{
   Expr**     cond;
   StmtList** nodes;
@@ -164,26 +191,125 @@ struct StmtList{
   size_t  stmts_size;
 };
 typedef enum TypeKind{
-  TYPESPEC_NONE,
-  TYPESPEC_NAME,
-  TYPESPEC_CONST,
-  TYPESPEC_PTR,
-  TYPESPEC_ARRAY,
-  TYPESPEC_UNSOLVED,
+  TYPE_NONE,
+  TYPE_I64,
+  TYPE_F64,
+  TYPE_CHAR,
+  TYPE_PTR,
+  TYPE_ARRAY,
+  TYPE_STRUCT,
+  TYPE_ENUM,
+  TYPE_PROC,
+  TYPE_UNSOLVED,
 } TypeSpecKind;
+
+TypeSpecKind TypeSpecKind_by_cstr(const char* type){
+  // NOTE: STR_CMP is defined in ../../common/utils.cpp
+#define DOIF_TYPE(str, ret_type)		\
+  if(STR_CMP(type, str)){			\
+    return ret_type;				\
+  }
+  DOIF_TYPE("i64",  TYPE_I64);
+  DOIF_TYPE("f64",  TYPE_F64);
+  DOIF_TYPE("char", TYPE_CHAR);
+#undef DOIF_TYPE
+  return TYPE_UNSOLVED;
+}
+const char* typekind_cstr(TypeKind kind){
+  (void) kind;
+  printf("ERROR: typekind_cstr is not implemented yet.\n");
+  exit(1);
+}
 // TODO: create
 struct Type{
   TypeKind kind;
-  bool     is_const;
+  const char* name;
   union{
-    const char* type_name;
-    Type* ptr_to;
-    Type* as_const;
     struct{
-      Type* type;
-      Expr* array_size;      
+      Type* base;
+    } ptr;
+    struct{
+      Type* base;
+      Expr* size;      
     } array;
+    struct{
+      TypeField* fields;
+      size_t fields_size;
+    } aggregate;
+    struct{
+      TypeField* params;
+      size_t params_size;
+      Type*  ret;
+    } proc;
   };
+};
+
+const char* human_type(Type* type){
+  switch(type->kind){
+  case TYPE_I64:
+    return "integer";
+  case TYPE_F64:
+    return "float";
+  case TYPE_PTR:
+    return "pointer";
+  case TYPE_CHAR:
+    return "char";
+  case TYPE_ARRAY:
+    return "array";
+  case TYPE_STRUCT:
+    return "struct";
+  case TYPE_ENUM:
+    return "procedure";
+  case TYPE_PROC:
+    return "procedure";
+  case TYPE_UNSOLVED:
+    return "unsolved type";
+  case TYPE_NONE:
+    return "none";    
+  default:
+    error_here("unhandled type kind.\n");
+  }
+}
+// TODO: make a short version of this
+
+
+
+Type* type_alloc(TypeKind kind){
+  Type *t = new Type;
+  t->kind = kind;
+  return t;
+}
+Type* type_int(){
+  return type_alloc(TYPE_I64);
+}
+typedef struct CachedPtrType{
+  Type* base;
+  Type* ptr;
+} CachedPtrType;
+CachedPtrType* cached_ptr_types;
+
+Type* type_ptr(Type* base){
+  for(CachedPtrType* it = cached_ptr_types; it != buf__end(cached_ptr_types); ++it){
+    if(it->base == base){
+      return it->ptr;
+    }
+  }
+  Type* ptr = type_alloc(TYPE_PTR);
+  ptr->ptr.base = base;
+  
+  // save this ptr
+  CachedPtrType new_cached = {
+    .base = base,
+    .ptr  = ptr
+  };
+  buf__push(cached_ptr_types, new_cached);
+  return ptr;
+}
+
+
+struct TypeField{
+  const char* name;
+  Type* type;
 };
 struct TypeSpec{
   const char* name;
@@ -191,14 +317,14 @@ struct TypeSpec{
 };
 
 enum DeclKind{
-  DECLKIND_NONE,
-  DECLKIND_ENUM,
-  DECLKIND_STRUCT,
-  DECLKIND_UNION,
-  DECLKIND_VAR,
-  DECLKIND_TYPEDEF,
-  DECLKIND_PROC,
-  DECLKIND_CIMPORT
+  DECL_NONE,
+  DECL_ENUM,
+  DECL_STRUCT,
+  DECL_UNION,
+  DECL_VAR,
+  DECL_TYPEDEF,
+  DECL_PROC,
+  DECL_CIMPORT
 };
 struct Proc{
   ProcArgs  *args;
@@ -209,12 +335,12 @@ struct Decl{
   DeclKind kind;
   const char* name;
   union{
-    //Var*  varDecl;
+    Var  varDecl;
     //Proc* procDecl;
-    struct{
-      Type*     type;
-      Expr*     expr;
-    } varDecl;
+    //struct{
+    //  Type*     type;
+    //  Expr*     expr;
+    //} varDecl;
     struct{
       ProcArgs  *args;
       Type      *ret_type;
@@ -234,7 +360,14 @@ struct Decl{
     } Typedef;
   } as;
 };
-
+Decl* decl_var(const char* name, Type* type, Expr* expr){
+  (void) name;
+  (void) type;
+  (void) expr;
+  printf("ERROR: decl_var is not implemented yet.\n");
+  exit(1);
+  return {};
+}
 struct ProcArgs{
   TypeSpec   **argsList;
   size_t       argsList_size;
@@ -270,17 +403,24 @@ Expr* expr_make_binary(Expr* lhs, Expr* rhs, EXPR_BINARY_OP_KIND op){
   expr_bin->as.BinaryOp.op	= op;
   expr_bin->as.BinaryOp.lhs	= lhs;
   expr_bin->as.BinaryOp.rhs	= rhs;
-  return expr_bin;
-  
+  return expr_bin;  
+}
+Expr* expr_int(int val){
+  return new Expr{
+    .kind = EXPRKIND_INT,
+    .as   = {
+      .INT = val
+    }
+  };
 }
 void print_expr(Expr* e){
   switch(e->kind){
   case EXPR_BINARY_OP:
-    printf("(%c ", e->as.BinaryOp.op);    
+    printf("( ");
     print_expr(e->as.BinaryOp.lhs);
-    printf(" ");
+    printf(" %s ", human_expr_binary_op_kind(e->as.BinaryOp.op));
     print_expr(e->as.BinaryOp.rhs);
-    printf(" ) ");
+    printf(" )");
     break;
   case EXPR_COMPARASION:
     printf("(cmp [(");
@@ -303,11 +443,11 @@ void print_expr(Expr* e){
     printf("])");    
     break;
   case EXPRKIND_NAME:
-    printf("%s", e->as.name);
+    printf("%s", e->name);
     break;
   case EXPRKIND_STRING_LITERAL:
     printf("string(\"%s\")",
-	   e->as.name);
+	   e->as.STRING);
     break;
   case EXPRKIND_PROC_CALL:
     printf("call(%s[",
@@ -345,33 +485,39 @@ void print_expr(Expr* e){
 }
 void print_type(Type* t){
   switch(t->kind){
-  case TYPESPEC_NAME:  
-    printf("%s", t->type_name);
-    break;
-  case TYPESPEC_PTR:
+  case TYPE_PTR:
     printf("ptr_to(");
-    print_type(t->ptr_to);
+    print_type(t->ptr.base);
     printf(")");
     break;
-  case TYPESPEC_CONST:
-    printf("const(");
-    print_type(t->as_const);
-    printf(")");
+
+  case TYPE_UNSOLVED:
+    printf("[unsolved: %s]", t->name);
     break;
-  case TYPESPEC_UNSOLVED:
-    printf("unsolved");
-    break;
-  case TYPESPEC_ARRAY:
+  case TYPE_ARRAY:
     printf("array(");
-    if(t->array.array_size)
-      print_expr(t->array.array_size);
+    if(t->array.size)
+      print_expr(t->array.size);
     printf(")");
     
     break;
-  case TYPESPEC_NONE:
+  case TYPE_NONE:
     printf("none");
     break;
-
+  case TYPE_I64:
+    printf("i64");
+    break;
+  case TYPE_F64:
+    printf("f64");
+    break;
+  case TYPE_CHAR:
+    printf("char");
+    break;
+  case TYPE_PROC:
+    printf("proc");
+    break;
+  case TYPE_STRUCT:
+  case TYPE_ENUM:
   default:
     printf("Unexpected TypeSpecKind\n");
     exit(1);
@@ -390,20 +536,18 @@ void print_stmt(Stmt* s){
     break;
   case STMTKIND_LOCAL_VAR:
     printf("(var %s[",
-	   s->as.var->name);
-    print_type(s->as.var->type);
+	   s->as.var->type_field->name);
+    print_type(s->as.var->type_field->type);
     printf("]");
     if(s->as.var->expr){
       printf("=[");
       print_expr(s->as.var->expr);
-      printf("])\n");
+      printf("]");
     }
+    printf(")\n");
     break;
 
-  case STMTKIND_SWITCH:
-  case STMTKIND_BREAK:
-  case STMTKIND_CONTINUE:
-  case STMTKIND_STMT:
+
   case STMTKIND_IF:
     printf("(if \n");
     ident++;
@@ -471,6 +615,10 @@ void print_stmt(Stmt* s){
     ident();
     printf(")");
     break;
+  case STMTKIND_SWITCH:
+  case STMTKIND_BREAK:
+  case STMTKIND_CONTINUE:
+  case STMTKIND_STMT:
   case STMTKIND_DO_WHILE:
   case STMTKIND_FOR:
   default:
@@ -489,22 +637,22 @@ void print_stmt_list(StmtList* b){
 }
 void print_decl(Decl* d){
   switch(d->kind){
-  case DECLKIND_TYPEDEF:
+  case DeclKind::DECL_TYPEDEF:
     printf("typedef (");
     print_type(d->as.Typedef.type);
     printf(") = (");
     print_type(d->as.Typedef.type_equivalent);
     printf(")\n");    
     break;
-  case DECLKIND_VAR:
+  case DeclKind::DECL_VAR:
     printf("(var %s[",
 	   d->name);
-    print_type(d->as.varDecl.type);
+    print_type(d->as.varDecl.type_field->type);
     printf("] = ( ");
     print_expr(d->as.varDecl.expr);
     printf(" ))\n");
     break;
-  case DECLKIND_PROC:
+  case DeclKind::DECL_PROC:
     ident();
     printf("( proc [%s->",
 	   d->name);
@@ -531,10 +679,10 @@ void print_decl(Decl* d){
     printf(")");    
     newline();
     break;
-  case DECLKIND_STRUCT:
+  case DeclKind::DECL_STRUCT:
     printf("(struct %s\n", d->name);
     ident++;
-    for(size_t i=0; i< d->as.structDecl.fields_size; ++i){
+    for(size_t i=0; i < d->as.structDecl.fields_size; ++i){
       ident();
       print_typespec(d->as.structDecl.fields[i]);
       newline();
@@ -543,10 +691,9 @@ void print_decl(Decl* d){
     ident();
     printf(")");
     break;
-  case DECLKIND_CIMPORT:
-  case DECLKIND_NONE:
-  case DECLKIND_ENUM:
-  case DECLKIND_UNION:
+  case DeclKind::DECL_CIMPORT:
+  case DeclKind::DECL_ENUM:
+  case DeclKind::DECL_UNION:
   default:
     printf("Unexpected DeclKind\n");
     exit(1);
@@ -562,24 +709,9 @@ void print_ast(Decl** ast){
     
   }
 }
-// TODO
 
 typedef Decl** AST_ROOT;
 typedef Decl*  AST_NODE;
-
-Type* type_ptr(Type* ptr_target){
-  Type* result = new Type;
-  result->kind = TYPESPEC_PTR;
-  result->ptr_to = ptr_target;
-  return result;
-}
-Type* type_name(const char* str="<std::type>"){
-  Type* result = new Type;
-  result->kind = TYPESPEC_NAME;
-  result->type_name = str;
-  return result;
-}
-
 
 
 #endif /*__ast */

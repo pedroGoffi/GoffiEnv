@@ -1,0 +1,18 @@
+import "std/std.gfsl"
+
+proc strlen
+// ptr -- str 
+{
+  local iter 8 end
+  // &iter = ptr
+  iter rstore
+  
+}
+proc main {
+  // int
+  // str = ptr
+  local Str 8 end
+
+  while Str load do
+  end
+}

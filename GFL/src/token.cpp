@@ -74,17 +74,19 @@ typedef struct __STRING{
 typedef struct Token{
   TokenKind kind;
   TokenModifier modifier;
+  const char*   name;
   union{
     int           INT;
     double        FLOAT;
     const char*   STRING;
-    const char*   name;
   };
 } Token;
 Token token;
 
 const char *human_readable_token(TokenKind kind){  
   switch(kind){
+  case TokenKind::TOKEN_AT_SIGN:        return "=";
+  case TokenKind::TOKEN_CMP_NEQ:        return "!=";
   case TokenKind::TOKEN_STRING:		return "string";
   case TokenKind::TOKEN_INT:		return "number";
   case TokenKind::TOKEN_NAME:		return "name";

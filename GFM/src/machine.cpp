@@ -178,9 +178,10 @@ size_t Global_string_push(Machine* mn, const char* id, const char* str){
   return global_strings.strs_size - 1;
 }
 int Global_string_find(Machine* mn, const char* id){
+  (void) mn;
   for(size_t i=0; i < global_strings.strs_size; ++i){
     if(strcmp(global_strings.strs[i].var_name, id) == 0){
-      return i;
+      return (int)i;
     }
   }
   return -1;
@@ -223,7 +224,7 @@ void Buffer_write_cstr(Buffer* buffer, const char* cstr){
   Buffer_write(buffer, (void*)cstr, strlen(cstr));
 }
 Label_Table label_table = {};
-static Buffer write_buffer = {};
+// Buffer write_buffer = {};
 Word Label_Table_find(const Label_Table* lt, InternStr str){
   for(size_t i=0; i<lt->labels_size; ++i){
     if(InternStr_eq(lt->labels[i].name, str)){
@@ -443,7 +444,7 @@ CPUErrors Machine_write(Machine* mn){
 
   //write(int, const void*, size_t);
   size_t data_addr = global_strings.strs[str_addr].str_loc;
-  write(file_stream,
+  write((int)file_stream,
 	(const void*)(mn->buffer.data + data_addr),
 	str_len);
   
@@ -1079,7 +1080,13 @@ void Machine_compile_to_asmx86_64(Machine* mn, const char* output_fp){
       writefd("\n");
     }
     switch(inst.type){
-
+    case InstType::Not: {
+      writefd("\tnot\n");
+    } break;
+    case InstType::Get_addr: {
+      printf("TODO: parse Get_addr to asm code.\n");
+      exit(1);
+    } break;
     case InstType::Halt: {
       writefd("\tmov rax, 60\n");
       writefd("\tmov rdi, 0\n");

@@ -1,0 +1,9 @@
+// LINUS: COM
+macro stdout 1 end
+macro stderr 2 end
+macro SYS_write 1 end
+macro SYS_exit 60 end
+macro end 1 end
+// LINUX: COMMON SYSCALLS
+macro write SYS_write  syscall3  end
+

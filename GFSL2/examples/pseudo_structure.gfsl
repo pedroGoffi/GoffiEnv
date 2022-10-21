@@ -1,0 +1,10 @@
+import "std/std.gfsl"
+
+
+
+static STR 16 end
+proc main do
+  STR "hello" str!
+  STR str* puts
+  STR str-eq
+end

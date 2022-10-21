@@ -1,0 +1,25 @@
+#ifndef __assembler__
+#define __assembler__
+#include "./ast.cpp"
+/*
+  make a notion of opcode and operand
+  <opcode> <operand>, <operand>
+  <opcode> = {
+    opkind 
+    oplen
+  }
+  <operand> = {
+    operandKind
+    union operand_reg, operand_int, ...
+  }
+  mov QWORD [rsp - 8], 10
+*/
+
+void assembler_test(){
+  printf("UNIMPLEMENTED %s.\n", OPCODE_kind_cstr(PUSH));
+  for(auto& x: OPCODES){
+    printf("opcode %s of len %zu\n",
+	   x.name, x.len);
+  }
+}
+#endif /*__assembler__*/

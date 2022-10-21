@@ -328,8 +328,10 @@
 #define SYS_kcmp as  312 end
 #define SYS_finit_module as  313 end
 // LINUX: COMMON SYSCALLS
+
+
 #define fstat  as  SYS_fstat  syscall2  end
-#define openat as  SYS_openat syscall4  end
+#define openat as  SYS_openat syscall3  end
 #define write  as  SYS_write  syscall3  end
 #define fwrite as  64-> write drop      end
 #define fdel   as  SYS_unlink syscall1  end

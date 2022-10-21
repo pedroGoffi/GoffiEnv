@@ -1,0 +1,27 @@
+import "std/std.gfsl"
+
+proc fact
+// int -- the digit that we'll calculate the factorial
+{
+  local n    8 end
+  local iter 8 end  
+  n swap store
+  iter 1 store
+  // n    = digit
+  // iter = 1
+  while n load do // while(n)
+    iter load n load * iter swap store
+    // iter = iter * n
+    n load 1 - n swap store
+    // n = n - 1
+  end
+  iter load return
+  // return iter
+}
+proc sum_range
+// int -- min
+// int -- max
+{
+  "ERROR: sum_range is not implemented yet\n" eputs
+  1 exit 
+}

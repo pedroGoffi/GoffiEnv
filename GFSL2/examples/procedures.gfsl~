@@ -1,0 +1,8 @@
+proc some-func do
+  "This is some-func\n" puts
+end
+proc main do
+  "This is the entry point.\n" puts
+  some-func
+  
+end

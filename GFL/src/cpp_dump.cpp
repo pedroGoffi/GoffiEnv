@@ -5,64 +5,74 @@ FILE* fd = NULL;
 
 inline void gen_type(Type* type);
 inline void gen_stmt_list(StmtList* block);
+const char* std_includes[] = {
+  "<iostream>",
+  "<cstring>",
+  "<cassert>",
+  "<cstdarg>",
+  "<cstdint>",
+  "<cstdlib>",  
+  "\"std/gfl.cpp\""
+};
+#define genf(...) fprintf(fd, __VA_ARGS__)
 void gen_expr(Expr* expr){
   switch(expr->kind){
   case EXPRKIND_INT:
-    fprintf(fd, "%i", expr->as.INT);
+    genf("%i", expr->as.INT);
     break;
   case EXPRKIND_NAME:
-    fprintf(fd, "%s", expr->as.name);
+    genf("%s", expr->name);
     break;
   case EXPRKIND_PROC_CALL:
-    fprintf(fd, "%s",expr->as.Call.p_name);
+    genf("%s",expr->as.Call.p_name);
     {
-      fprintf(fd, "(");
+      genf("(");
       for(size_t i=0;i<buf__len(expr->as.Call.args);++i){
-	fprintf(fd, (i>0)?", ":"");
+	genf((i>0)?", ":"");
         gen_expr(expr->as.Call.args[i]);
       }
-      fprintf(fd, ")");
+      genf(")");
     }
     break;
   case EXPRKIND_REASIGN:
     gen_expr(expr->as.Reasign.from);    
-    fprintf(fd, "=");
+    genf("=");
     gen_expr(expr->as.Reasign.to);
-    fprintf(fd, ";");    
+    genf(";");    
     break;
   case EXPRKIND_CAST:
-    fprintf(fd, "((");
+    genf("((");
     gen_type(expr->as.Cast.type->type);
-    fprintf(fd, ")");
+    genf(")");
     gen_expr(expr->as.Cast.expr);
-    fprintf(fd, ")");
+    genf(")");
     break;
   case EXPRKIND_STRING_LITERAL:
-    fprintf(fd, "\"%s\"", expr->as.name);
+    genf("\"%s\"", expr->name);
     break;
   case EXPR_BINARY_OP:
-    fprintf(fd, "(");
+    genf("(");
     gen_expr(expr->as.BinaryOp.lhs);
-    fprintf(fd, "%c", expr->as.BinaryOp.op);
+    genf("%s", human_expr_binary_op_kind(expr->as.BinaryOp.op));
     gen_expr(expr->as.BinaryOp.rhs);    
-    fprintf(fd, ")");
+    genf(")");
     break;
   case EXPR_COMPARASION:
-    fprintf(fd, "((");
+    genf("((");
     gen_expr(expr->as.comparasion.lhs);
-    fprintf(fd, ")%s(", human_readable_token(expr->as.comparasion.op));
+    genf(")%s(", human_expr_cmp_kind(expr->as.comparasion.op));
     gen_expr(expr->as.comparasion.rhs);
-    fprintf(fd, "))");    
+    genf("))");    
     break;
   case EXPRKIND_ADDROF_NAME:
-    fprintf(fd, "&(");
+    genf("&(");
     gen_expr(expr->as.addr_of);
-    fprintf(fd, ")");    
+    genf(")");    
     break;
   case EXPRKIND_DERREF_NAME:
-    fprintf(fd, "*(");
+    genf("*(");
     gen_expr(expr->as.derref);
-    fprintf(fd, ")");
+    genf(")");
     break;
   default:
     fprintf(stderr,
@@ -71,55 +81,56 @@ void gen_expr(Expr* expr){
   }
 }
 inline void gen_type(Type* type){
-  if(type->is_const) fprintf(fd, "const ");
   switch(type->kind){
-  case TypeKind::TYPESPEC_NAME:
-    fprintf(fd, "%s", type->type_name);
+    
+  case TypeKind::TYPE_I64:
+    genf("int64_t");
     break;
-  case TypeKind::TYPESPEC_PTR:
-    gen_type(type->ptr_to);
-    fprintf(fd, "*");
+  case TypeKind::TYPE_F64:
+    genf("double");
     break;
-  case TypeKind::TYPESPEC_ARRAY:
-    gen_type(type->array.type);
-    fprintf(fd, "[");
-    if(type->array.array_size)
-      gen_expr(type->array.array_size);
-    fprintf(fd, "]");
+    
+  case TypeKind::TYPE_PTR:
+    gen_type(type->ptr.base);
+    genf("*");
     break;
-  case TypeKind::TYPESPEC_CONST:
-    fprintf(fd, "const ");
-    gen_type(type->as_const);
+  case TypeKind::TYPE_ARRAY:
+    gen_type(type->array.base);
+    genf("[");
+    if(type->array.size){
+      //gen_expr(type->array.array_size);
+    }
+    genf("]");
     break;
 
-  case TypeKind::TYPESPEC_UNSOLVED:
+  case TypeKind::TYPE_UNSOLVED:
     fprintf(stderr,
 	    "ERROR: the compiler could not gen the automatic type for the variable '%s', please specify the type.\n",
 	    "TODO: get the var name");
     exit(1);
     break;
-  case TypeKind::TYPESPEC_NONE:
+  case TypeKind::TYPE_NONE:
   default:
     fprintf(stderr, "ERROR: unexpected type->kind in gen_type.\n");
     exit(1);
   }
 }
 void gen_var(Var* var){
-  gen_type(var->type);
-  fprintf(fd, " %s", var->name);
-  if(var->expr != nullptr){
-    fprintf(fd, "=");
+  gen_type(var->type_field->type);
+  genf(" %s", var->type_field->name);
+  if(var->expr){
+    genf("=");
     gen_expr(var->expr);
   }
-  fprintf(fd, ";\n");
+  genf(";\n");
 }
 inline void gen_typespec(TypeSpec* typespec){
   gen_type(typespec->type);
-  fprintf(fd, " %s", typespec->name);
+  genf(" %s", typespec->name);
 }
 void gen_proc_args(ProcArgs* args){
   for(size_t i=0; i<args->argsList_size; ++i){
-    fprintf(fd, i>0?", ":"");
+    genf(i>0?", ":"");
     gen_typespec(args->argsList[i]);
   }
 }
@@ -127,48 +138,48 @@ void gen_proc_args(ProcArgs* args){
 void gen_stmt(Stmt* stmt){
   switch(stmt->kind){
   case STMTKIND_RETURN:
-    fprintf(fd, "return ");
+    genf("return ");
     gen_expr(stmt->as.expr);
-    fprintf(fd, ";\n");
+    genf(";\n");
     break;
   case STMTKIND_LOCAL_VAR:{
     gen_var(stmt->as.var);
   } break;
   case STMTKIND_EXPR:
     gen_expr(stmt->as.expr);
-    fprintf(fd, ";\n");
+    genf(";\n");
     break;
   case STMTKIND_IF: {
     // if(!(expr)) goto END
     //
-    fprintf(fd, "if(");
+    genf("if(");
     gen_expr(stmt->as.__if.expr);
-    fprintf(fd, "){\n");
+    genf("){\n");
     gen_stmt_list(stmt->as.__if.block);
-    fprintf(fd, "}\n");
+    genf("}\n");
     if(stmt->as.__if.elif_nodes){
       for(size_t i = 0; i < stmt->as.__if.elif_nodes->nodes_size; ++i ){
-	fprintf(fd, "else if (");
+	genf("else if (");
 	gen_expr(stmt->as.__if.elif_nodes->node_expr[i]);
-	fprintf(fd, "){");
+	genf("){");
 	gen_stmt_list(stmt->as.__if.elif_nodes->node_block[i]);
-	fprintf(fd, "}\n");	
+	genf("}\n");	
       }
     }
     if(stmt->as.__if.else_block){
-      fprintf(fd, "else{");
+      genf("else{");
       gen_stmt_list(stmt->as.__if.else_block);
-      fprintf(fd, "}\n");
+      genf("}\n");
     }
   } break;
   case STMTKIND_WHILE:{
     // TODO: pre-compile the label number for nested ifs
 
-    fprintf(fd, "while(");
+    genf("while(");
     gen_expr(stmt->as.__while.expr);
-    fprintf(fd, "){\n");
+    genf("){\n");
     gen_stmt_list(stmt->as.__while.block);
-    fprintf(fd, "}\n");
+    genf("}\n");
   } break;
   default:
     fprintf(stderr, "ERROR: could not generate the statement.\n");
@@ -182,60 +193,57 @@ inline void gen_stmt_list(StmtList* block){
 }
 void gen_cpp_from_ast_node(AST_NODE node){
   switch(node->kind){
-  case DeclKind::DECLKIND_TYPEDEF:
-    fprintf(fd, "typedef ");
+  case DeclKind::DECL_TYPEDEF:
+    genf("typedef ");
     gen_type(node->as.Typedef.type);
-    fprintf(fd, " ");
+    genf(" ");
     gen_type(node->as.Typedef.type_equivalent);
-    fprintf(fd, ";\n");
+    genf(";\n");
     break;
-  case DeclKind::DECLKIND_VAR:{
+  case DeclKind::DECL_VAR:{
     Var* var = new Var{
-      node->name,
-      node->as.varDecl.type,
+      node->as.varDecl.type_field,
       node->as.varDecl.expr
-      
     };
     gen_var(var);
     break;
   }
-  case DeclKind::DECLKIND_PROC:{
+  case DeclKind::DECL_PROC:{
     printf("at declkind_proc\n");
     gen_type(node->as.procDecl.ret_type);
-    fprintf(fd, " %s", node->name);
+    genf(" %s", node->name);
     { // gen the '(' args ')' stuff
-      fprintf(fd, "(");
+      genf("(");
       gen_proc_args(node->as.procDecl.args);
-      fprintf(fd, ")");
+      genf(")");
     }
     
     if(node->as.procDecl.block){ // gen the procedure body
-      fprintf(fd, "{\n");
+      genf("{\n");
       gen_stmt_list(node->as.procDecl.block);    
-      fprintf(fd, "}\n");
+      genf("}\n");
     } else {
-      fprintf(fd, ";\n");
+      genf(";\n");
     }
   } break;
-  case DeclKind::DECLKIND_ENUM:
-  case DeclKind::DECLKIND_STRUCT:
-  case DeclKind::DECLKIND_UNION:
-  case DeclKind::DECLKIND_CIMPORT:
-  case DeclKind::DECLKIND_NONE:
+  case DeclKind::DECL_ENUM:
+  case DeclKind::DECL_STRUCT:
+  case DeclKind::DECL_UNION:
+  case DeclKind::DECL_CIMPORT:
   default:
     fprintf(stderr, "ERROR: unexpected node->kind in gen_cpp_from_ast_node.\n");
     exit(1);
   }
 }
+
 void gen_cpp_file_from_ast(AST_ROOT ast, const char* output_fp)
 {
   fd = fopen(output_fp, "wb");
   assert(fd);
-  // todo some fun stuff
-  fprintf(fd, "#include <iostream>\n");
-  fprintf(fd, "#include <cstring>\n");
-  fprintf(fd, "#include <cassert>\n");
-    
+  
+  for(auto& inc: std_includes){
+    genf("#include %s\n", inc);
+  }
   for(size_t i=0; i<buf__len(ast); ++i){
     gen_cpp_from_ast_node(ast[i]);
   }

@@ -1,0 +1,48 @@
+// NOTE:  sizeof(stat) = 144
+macro stat-st_dev	 0	+ end
+macro stat-st_ino	 8	+ end
+macro stat-st_nlink	 16 	+ end
+macro stat-st_mode	 24	+ end
+macro stat-st_uid	 28 	+ end
+macro stat-st_gid	 32 	+ end
+macro stat-st_rdev	 40 	+ end
+macro stat-st_size	 48 	+ end
+macro stat-st_blksize	 56 	+ end
+macro stat-st_blocks	 64 	+ end
+macro stat-st_atim	 72 	+ end
+macro stat-st_mtim	 88 	+ end
+macro stat-st_ctim	 104	+ end
+
+inline proc fopen
+  // ptr -- FILE* destination
+  // ptr -- char* file path
+{
+  load AT_FDCWD openat store
+}
+
+
+proc get-file-text
+  // ptr -- FILE* file descriptor
+{
+  local Str 16 end
+  local statbuf 144 end
+  local fd 8 end
+  load fd swap store
+
+  statbuf
+  fd load
+  fstat
+  drop
+  
+  0
+  fd load
+  MAP_PRIVATE
+  PROT_READ
+  statbuf stat-st_size load
+  NULL
+  mmap
+  // stack: ptr
+  statbuf stat-st_size load
+  swap  
+  // stack int ptr
+}

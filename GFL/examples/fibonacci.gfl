@@ -1,7 +1,7 @@
-var F_0: i64;
+var F_0: i64[1];
 var F_1: i64;
 var F_2: i64;
-var LIMIT: i64;
+var LIMIT: i64 = 1;
 
 proc main(): int {
   LIMIT = 500;
@@ -11,7 +11,7 @@ proc main(): int {
     F_0 = F_1 + F_2;
     F_1 = F_2;
     F_2 = F_0;
-    __builtin_print_i64__(1);
+    __builtin_print_i64__(F_0);
   }
   __builtin_print_i64__(420);
 }

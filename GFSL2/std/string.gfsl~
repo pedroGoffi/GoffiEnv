@@ -1,0 +1,18 @@
+proc strlen
+{
+  local sa 8 end
+  // a sa
+  sa swap store
+  sa load8 dump
+  1 exit
+  
+}
+proc streq
+{
+  local sa 8 end
+  local sb 8 end
+  // sa sb SB
+  sb swap store
+  sa swap store
+  sb strlen dump
+}

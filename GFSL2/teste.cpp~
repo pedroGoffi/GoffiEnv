@@ -1,0 +1,19 @@
+#include <iostream>
+#include "src/gfsl.cpp"
+
+int main() {
+  printf("macro program %zu end\n");
+  printf("macro program-size %zu end\n");
+  printf("macro program %zu end\n");
+  printf("sizeof(struct gfsl) = %zu\n", sizeof(struct gfsl));
+  
+  Inst    program[GFSL_PROGRAM_CAPACITY];
+  size_t  program_size;
+  
+  Inst    final_program[GFSL_PROGRAM_CAPACITY];
+  size_t  final_program_size;
+  
+  size_t  stack[GFSL_STACK_CAPACITY];
+  size_t  stack_size;
+
+}

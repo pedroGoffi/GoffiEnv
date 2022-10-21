@@ -17,8 +17,9 @@ Expr* parse_e2();
 Expr* parse_expr();
 TypeSpec* parse_typespec();
 Type* parse_type();
+TypeField* parse_typefield();
 Type* unsolved_type();
-Decl* parse_var_decl();
+Decl* parse_global_var();
 Var*  parse_var_def();
 Decl* parse_decl();
 Stmt* parse_stmt();
@@ -91,7 +92,8 @@ Expr *parse_e0(){
     const char* NAME = consume().name;    
     if(is_token(TOKEN_OPEN_R_PAREN)){
       e->kind = EXPRKIND_PROC_CALL;
-      e->as.Call.p_name = consume().name;
+      e->as.Call.p_name = NAME;
+      next_token();
       Expr **args = NULL;
       e->as.Call.args_size = 0; 
       while(!is_token(TOKEN_CLOSE_R_PAREN)){
@@ -126,9 +128,9 @@ Expr *parse_e0(){
       MustExpect(TOKEN_CLOSE_S_PAREN);
       return e;
     }
-    //MustExpect(TOKEN_NAME);
+
     e->kind = EXPRKIND_NAME;
-    e->as.name = token.name;
+    e->name = NAME;
     return e;
   }
   fatal("Unexpected token: `%s` when trying to parse a number.\n",
@@ -216,36 +218,37 @@ Expr* parse_expr(){
 
 Type* parse_type(){
   Type* type = new Type;
-  type->is_const = false;  
+
   if(expect_token(TOKEN_STAR)){
-    type->kind   = TYPESPEC_PTR;
-    type->ptr_to = parse_type();
+    type->kind     = TYPE_PTR;
+    type->ptr.base = parse_type();
     return type;
   }
-  if(expect_name("const")){   
-    type->kind = TYPESPEC_CONST;
-    type->as_const = parse_type();
-    return type;
-  } 
   assert(token.kind == TOKEN_NAME);
-  type->is_const = false;
-  type->kind = TYPESPEC_NAME;
-  type->type_name = consume().name;
-  
+  type->kind = TypeSpecKind_by_cstr(token.name);
+  type->name = token.name;
+  next_token();
   if(expect_token(TOKEN_OPEN_S_PAREN)){
-    Type* array = new Type;
-    array->kind = TYPESPEC_ARRAY;
-    array->array.type = type;
-    array->array.array_size = nullptr;
+    Type* t = new Type;
+    t->kind = TYPE_ARRAY;
+    t->array.base = type;
+    t->array.size = nullptr;
     if(!is_token(TOKEN_CLOSE_S_PAREN)){
-      array->array.array_size = parse_expr();
+      t->array.size = parse_expr();
     }
     MustExpect(TOKEN_CLOSE_S_PAREN);
-    return array;
+    return t;
   }
   return type;
 }
-  
+TypeField* parse_typefield(){
+  assert(token.kind == TOKEN_NAME);
+  TypeField* tf = new TypeField;
+  tf->name = consume().name;
+  MustExpect(TOKEN_DOUBLE_DOT);  
+  tf->type = parse_type();
+  return tf;
+}
 TypeSpec* parse_typespec(){
   assert(token.kind == TOKEN_NAME);
   TypeSpec* ts = new TypeSpec; 
@@ -256,7 +259,7 @@ TypeSpec* parse_typespec(){
 }
 inline Type* unsolved_type(){
   Type* t = new Type;
-  t->kind  = TYPESPEC_UNSOLVED;
+  t->kind  = TYPE_UNSOLVED;
   return t;
 }
 inline Type* type_from_typespec_kind(TypeSpecKind kd){
@@ -267,26 +270,21 @@ inline Type* type_from_typespec_kind(TypeSpecKind kd){
 Var*  parse_var_def(){
   assert(token.kind == TOKEN_NAME);
   Var* v = new Var;
-  v->name = consume().name;
+  v->type_field = parse_typefield();
   v->expr = NULL;
-
-  if(expect_token(TOKEN_DOUBLE_DOT)){
-    if(!is_token(TOKEN_EQ)){   
-      v->type = parse_type();
-    }
-    else {
-      v->type = unsolved_type();
-    }
-
-  }
-
   if(expect_token(TOKEN_EQ)){
     v->expr = parse_expr();
   }  
   MustExpect(TOKEN_DOT_AND_COMMA);
   return v;
 }
-
+Decl* parse_global_var(){
+  Decl* gvar = new Decl;
+  gvar->kind = DeclKind::DECL_VAR;
+  gvar->as.varDecl = *parse_var_def();
+  gvar->name = gvar->as.varDecl.type_field->name;
+  return gvar;
+}
 Elif* parse_elif_nodes(){
   Elif*      elif = new Elif;
   Expr**     nodes_expr = NULL;
@@ -438,11 +436,13 @@ ProcArgs* parse_proc_args(){
 }
 Decl* parse_proc_def(){
   Decl* proc = new Decl;
-  proc->kind = DECLKIND_PROC;
+  proc->kind = DeclKind::DECL_PROC;
   proc->name = consume().name;
   proc->as.procDecl.args = parse_proc_args();
+  proc->as.procDecl.ret_type = NULL;
+  // TODO: make a uncomplete type
   if(is_token(TOKEN_DOUBLE_DOT)){
-    next_token();
+    next_token();    
     proc->as.procDecl.ret_type = parse_type();
   }
   if(is_token(TOKEN_EQ)){
@@ -464,8 +464,9 @@ Decl* parse_proc_def(){
 
 Decl* parse_struct_def(){
   Decl          *dec = new Decl;
-  dec->kind = DECLKIND_STRUCT;
+  dec->kind = DeclKind::DECL_STRUCT;
   dec->name = consume().name;
+  dec->as.structDecl.fields_size = 0;
   MustExpect(TOKEN_OPEN_C_PAREN);
   TypeSpec **fields = NULL;
   while(!is_token(TOKEN_CLOSE_C_PAREN)){
@@ -481,7 +482,7 @@ Decl* parse_cimport(){
   assert(token.kind == TOKEN_NAME);
   next_token();
   Decl* cimport = new Decl;
-  cimport->kind = DECLKIND_CIMPORT;
+  cimport->kind = DeclKind::DECL_CIMPORT;
   if(expect_token(TOKEN_LESS)){
     assert(token.kind == TOKEN_NAME);
     cimport->as.cimportDecl.FILENAME = consume().name;
@@ -502,7 +503,7 @@ Decl* parse_typedef(){
   Type* equivalent = parse_type();
   MustExpect(TOKEN_DOT_AND_COMMA);
   Decl* Typedef = new Decl;
-  Typedef->kind = DECLKIND_TYPEDEF;
+  Typedef->kind = DeclKind::DECL_TYPEDEF;
   Typedef->as.Typedef.type       = type;
   Typedef->as.Typedef.type_equivalent = equivalent;
   return Typedef;
@@ -513,38 +514,17 @@ Decl* parse_decl(){
     exit(1);
   }
   if(expect_name(VAR_KEYWORD)){
-    Decl* var = new Decl;
-    var->kind = DECLKIND_VAR;
-    
-    assert(token.kind == TOKEN_NAME);
-    var->name = consume().name;    
-
-    MustExpect(TOKEN_DOUBLE_DOT);
-    var->as.varDecl.type = parse_type();
-      
-    var->as.varDecl.expr = NULL;
-    if(expect_token(TOKEN_EQ)){
-      var->as.varDecl.expr = parse_expr();
-    }
-    MustExpect(TOKEN_DOT_AND_COMMA);
-    return var;
+    return parse_global_var();
   }
   else if(expect_name(PROC_KEYWORD)){
-    Decl* proc = new Decl;    
-    proc = parse_proc_def();
-    return proc;
+    return parse_proc_def();
   }
 
-  else if(expect_name(STRUCT_KEYWORD)){
-    Decl* _struct = new Decl;
-    _struct = parse_struct_def();
-    
-    return _struct;
+  else if(expect_name(STRUCT_KEYWORD)){    
+    return parse_struct_def();
   }
-  else if(expect_name(TYPEDEF_KEYWORD)){
-    Decl* Typedef = new Decl;
-    Typedef = parse_typedef();
-    return Typedef;
+  else if(expect_name(TYPEDEF_KEYWORD)){    
+    return parse_typedef();
   }
   else if(expect_name(ENUM_KEYWORD)){
     fatal("parsing enums are not implemented yet\n");
@@ -555,10 +535,8 @@ Decl* parse_decl(){
     exit(1);
   }
   else if(expect_token(TOKEN_HASHTAG)){
-    if(token_is_name("cimport")){
-      Decl* cimport = new Decl;
-      cimport = parse_cimport();
-      return cimport;
+    if(token_is_name("cimport")){      
+      return parse_cimport();
     }
     else if(token_is_name("import")){
       printf("includes are not implemented yet\n");

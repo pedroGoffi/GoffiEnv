@@ -1,0 +1,12 @@
+import "std/std.gfsl"
+
+
+proc fact do
+  "hello" puts
+  420 return 
+  "world" puts
+end
+
+proc main do
+  fact dump
+end

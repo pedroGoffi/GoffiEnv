@@ -214,9 +214,11 @@ void next_token(){
     break;
   case '\'':
     lexer_scan_char();
+    token.name          = str_intern_range(stream_begin, stream);
     break;
   case '"':
     lexer_scan_string();
+    token.name          = str_intern_range(stream_begin, stream);
     break;
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9': {
@@ -231,21 +233,25 @@ void next_token(){
       lexer_scan_int();      
     }
     assert(*stream != '.');
+    token.name          = str_intern_range(stream_begin, stream);
 
   } break;
   case '/':
     token.kind = TOKEN_DIV;
     stream++;
+    token.name          = str_intern_range(stream_begin, stream);
     if (*stream == '/'){
       while(*stream++ != '\n'){}
       next_token();
-    }      
+    }
+
     break;
 
-#define kind1(k, r)				\
-    case k:					\
-      token.kind = r;				\
-      stream++;					\
+#define kind1(k, r)							\
+    case k:								\
+      token.kind = r;							\
+      stream++;								\
+      token.name          = str_intern_range(stream_begin, stream);\
       break;
     // ------------------------------
     kind1('!',  TOKEN_BANG);
@@ -268,13 +274,15 @@ void next_token(){
     kind1('}',  TOKEN_CLOSE_C_PAREN);
     kind1('\0', TOKEN_EOF);
 #undef kind1           
-#define kind2(fkind, fres, sres)		\
-    case fkind:					\
-      token.kind = fres;			\
-      stream++;					\
-      if (*stream == fkind)			\
-	token.kind = sres;			\
-      stream++;					\
+#define kind2(fkind, fres, sres)					\
+    case fkind:								\
+      token.kind = fres;						\
+      stream++;								\
+      if (*stream == fkind){						\
+	token.kind = sres;						\
+	stream++;							\
+      }									\
+      token.name          = str_intern_range(stream_begin, stream);\
       break;
     // ------------------------------
     kind2('-', TOKEN_TAKEAWAY, TOKEN_DLESS);
@@ -287,7 +295,8 @@ void next_token(){
     stream++;
     goto __next_token;
     break;    
-  }   
+  }
+  
 }
 inline bool is_token(TokenKind kind){
   return token.kind == kind;
