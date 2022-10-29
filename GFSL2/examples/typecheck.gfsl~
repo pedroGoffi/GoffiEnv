@@ -1,0 +1,8 @@
+inline proc puts int
+{
+   dump 
+}
+
+proc main{
+  1 puts
+}

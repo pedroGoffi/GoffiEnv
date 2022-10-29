@@ -14,15 +14,16 @@ macro stat-st_atim	 72 	+ end
 macro stat-st_mtim	 88 	+ end
 macro stat-st_ctim	 104	+ end
 
-inline proc fopen
-  // ptr -- FILE* destination
-  // ptr -- char* file path
-{
+// TODO: cast type checking
+macro fopen 
+//  ptr // -- FILE* destination
+//  ptr // -- char* file path
+//{
   load AT_FDCWD openat store
-}
+end
 
 
-proc get-file-text 
+proc get-file-text ptr: int ptr
   // ptr -- FILE* file descriptor
 {
   local fd        8 end
@@ -35,26 +36,30 @@ proc get-file-text
   fd load
   fstat
   drop
-  
+
   0
   fd load
   MAP_PRIVATE
   PROT_READ
   statbuf stat-st_size load
+
   NULL
+   
   mmap
+  statbuf stat-st_size load  
+  swap    cast-ptr
   
-  statbuf stat-st_size load
-  swap  
   // ... int ptr
 }
-proc cat 
-// ... ptr
-{
-  local fd        8 end
-  local file_path 8 end   
-  file_path swap store  
-  fd O_READONLY file_path load fopen  
-  fd get-file-text puts
-// ... void
-}
+//proc cat 
+//ptr // ... ptr
+//{
+//  local fd        8 end
+//  local file_path 8 end   
+//  file_path swap store  
+//  fd O_READONLY file_path load cast-ptr fopen  
+//  fd get-file-text puts
+//  drop
+//// ... void
+//}
+//

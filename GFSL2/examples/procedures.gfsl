@@ -1,10 +1,7 @@
 import "std/std.gfsl"
+macro a 1 end
+proc main
+{
+  "sex" puts 
+}
 
-proc some-func do
-  "This is some-func\n" puts
-end
-
-proc main do
-  "This is the entry point.\n" puts
-  some-func
-end

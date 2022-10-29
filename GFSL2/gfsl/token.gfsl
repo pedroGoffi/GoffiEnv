@@ -1,0 +1,26 @@
+import "std/std.gfsl"
+// TODO
+//struct Token{
+//  int kind
+//  struct String{int len, ptr data} name
+//  int INT
+//}
+macro ErrMsg puts 1 exit end
+
+macro Token-kind 0  + end // 0  - 8
+macro Token-name 8  + end // 9  - 25
+macro Token-int  25 + end // 26 - 34
+static Token 34 end
+proc Token-cstr() ptr: int ptr{
+  local Token 34 end
+  Token swap store
+  
+  if Token Token-kind load TOKENKIND_NAME == do
+    Token Token-name str* return
+  end
+  "err msg\n" ErrMsg
+}
+
+proc main {
+  Token-cstr()
+}

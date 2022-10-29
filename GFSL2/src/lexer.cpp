@@ -268,7 +268,6 @@ void next_token(){
     kind1(')',  TOKEN_CLOSE_R_PAREN);
     kind1('{',  TOKEN_OPEN_C_PAREN);
     kind1('}',  TOKEN_CLOSE_C_PAREN);
-    kind1('\0', TOKEN_EOF);
 #undef kind1           
 #define kind2(fkind, fres, sres)		\
     case fkind:					\
@@ -285,10 +284,10 @@ void next_token(){
     kind2('=', TOKEN_EQ, TOKEN_CMP_EQ);
 #undef kind2
   default:
-    fatal("[WARNING]: unexpected token starts with '%c'.\n", *stream);
-    stream++;
-    goto __next_token;
-    break;    
+    if(*stream == '\0') return;
+    fprintf(stderr,
+	    "ERROR: undefined token at lexing stage, starts with '%c'\n", *stream);
+    exit(1);
   }   
 }
 inline bool is_token(TokenKind kind){

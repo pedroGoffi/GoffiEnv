@@ -1,17 +1,14 @@
 import "std/std.gfsl"
+import "std/file.gfsl"
 
-
-proc main do
+proc main {
    local content   16 end
-   local fd       64 end
-  
-content 240 store
+   local fd        8 end
+
+
    fd O_READONLY 1 nth-argv fopen
+   drop
    // fd = fopen(argv[1])
-   content fd get-file-text str!
-   // void* content = get_file_text(fd);
-     
-   content str* puts
-   // printf("%s", (char*)content).
+   fd get-file-text puts
   
-end
+}

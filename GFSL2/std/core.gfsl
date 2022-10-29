@@ -340,6 +340,6 @@ macro read   SYS_read   syscall3 end
 macro openat SYS_openat syscall3 end
 macro fstat  SYS_fstat  syscall2 end
 macro fclose SYS_close  syscall1 end
-macro exit   SYS_exit   syscall1 end
-
-macro mmap   SYS_mmap   syscall6  end
+macro exit   SYS_exit   syscall1 end 
+macro mmap   SYS_mmap   syscall6 end
+// TODO: inline proc mmap int int int int int int: int{

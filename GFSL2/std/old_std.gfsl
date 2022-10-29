@@ -1,13 +1,13 @@
 import "./std/core.gfsl"
 
-inline proc fputs int ptr int { write drop }
-inline proc eputs int ptr { stderr fputs }
-inline proc puts  int ptr { stdout fputs }
-inline proc exit  int     { SYS_exit syscall1 drop }
+inline proc fputs int ptr int {write drop}
+inline proc eputs int ptr {stderr fputs}
+inline proc puts  int ptr {stdout fputs}
+inline proc exit  int     {SYS_exit syscall1 drop}
 
 // INTRISIC HELPERS
 macro nth-argv
-  8 * argv + cast-ptr
+  8 * argv + 
 end
 // POINTER ARITHMETRIC
 macro rstore swap store end 
@@ -41,7 +41,9 @@ proc str!
 // str* derref a pointer std based string
 
 macro str* 
-  dup str-len  load swap
-      str-data load
+//  dup str-len  load swap
+//      str-data load
+
 end
+
 
