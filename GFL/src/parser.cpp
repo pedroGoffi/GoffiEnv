@@ -547,9 +547,14 @@ Decl* parse_decl(){
   }  
   else if(is_token(TOKEN_NAME)){
     const char* tk_name = consume().name;
-    if(expect_token(TOKEN_DOUBLE_DOT)){
-      syntax_error("unimplementedcompiler time constants\n");
-      exit(1);      
+    if(expect_token(TokenKind::TOKEN_ACCESS_FIELD)){
+      Stmt* macro_body = parse_stmt();
+      Macro macro = {
+	.name = tk_name,
+	.stmt = macro_body
+      };
+      GFL_Macros_push(macro);
+      return NULL;
     }
     else {
       syntax_error("unexpected global declaration `%s`\n", tk_name);
@@ -615,7 +620,9 @@ AST_ROOT parser_run_code(const char* src){
   AST_ROOT ast = NULL;
   while(*stream){
     Decl* node = parse_decl();
-    buf__push(ast, node);
+    if(node){
+      buf__push(ast, node);
+    }
   }
   return ast;
 }

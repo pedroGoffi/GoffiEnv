@@ -1,7 +1,7 @@
 #ifndef __order__
 #define __order__
 #include "./ast.cpp"
-#include "./assembler/assembler.cpp"
+
 typedef struct Sym Sym;
 typedef struct Entity Entity;;
 typedef struct VarEntity VarEntity;

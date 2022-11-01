@@ -9,8 +9,9 @@
 #include "./src/ordering.cpp"
 #include "./src/cpp_dump.cpp"
 #include "./src/compiler.cpp"
-#include "../GFM/src/machine.cpp" 
-
+#include "./src/assembler.cpp"
+#include "../GFSL2/src/gfsl.cpp"
+#include "../GFSL2/src/typechecker.cpp"
 
 enum CO_OPT{
   NONE,
@@ -21,11 +22,9 @@ enum CO_OPT{
 };
 
 int main(int argc, char** argv){
-  assembler_test();
-  exit(1);
   const char*  const program = shift(&argc, &argv);
   const char*  input_fp  = argv[0];
-  const char*  output_fp = "out.cpp";
+  const char*  output_fp = "out.asm";
   enum CO_OPT compiler_mode = CO_OPT::SIMULATE_GFM;
   bool debug_mode = false;
   // TODO: parse different args
@@ -62,10 +61,18 @@ int main(int argc, char** argv){
   
   AST_ROOT first_ast   = parser_run_code(entry_content);
   AST_ROOT ordered_ast = order_ast(first_ast);
-
+  assembly_ast_into_gfsl(ordered_ast);
+  
+  // some clean-up
   buf__free(first_ast);
 
   print_ast(ordered_ast);
+
+  gfsl_vr vr = {};
+  gfsl_cross_reference(&vr);
+  //TODO: in future typecheck_program(&vr);
+  gfsl_compile_program(&vr, output_fp);
+  compile_asm_to_binary(output_fp);
   (void) compiler_mode;
   (void) debug_mode;
   return 0;   

@@ -1,5 +1,0 @@
-#ifndef __OPERAND__
-#define __OPERAND__
-#include "../ast.cpp"
-
-#endif /*__OPERAND__*/

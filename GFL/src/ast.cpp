@@ -203,6 +203,32 @@ typedef enum TypeKind{
   TYPE_UNSOLVED,
 } TypeSpecKind;
 
+struct Macro{
+  const char* name;
+  Stmt*       stmt;
+};
+
+Macro* GFL_macros = NULL;
+int GFL_Macros_pos(const char* name){
+  for(size_t i=0; i < buf__len(GFL_macros); ++i){
+    if(STR_CMP(GFL_macros[i].name, name)){
+      return (int)i;
+    }
+  }
+  return -1;
+}
+Macro* GFL_Macros_find(const char* name){
+  int idx = GFL_Macros_pos(name);
+  if(idx < 0) return NULL;  
+  return &GFL_macros[idx];
+}
+
+inline bool GFL_MACROS_exists(const char* name){
+  return (GFL_Macros_pos(name) != -1);
+}
+void GFL_Macros_push(Macro macro){
+  buf__push(GFL_macros, macro);
+}
 TypeSpecKind TypeSpecKind_by_cstr(const char* type){
   // NOTE: STR_CMP is defined in ../../common/utils.cpp
 #define DOIF_TYPE(str, ret_type)		\
@@ -216,9 +242,23 @@ TypeSpecKind TypeSpecKind_by_cstr(const char* type){
   return TYPE_UNSOLVED;
 }
 const char* typekind_cstr(TypeKind kind){
-  (void) kind;
-  printf("ERROR: typekind_cstr is not implemented yet.\n");
-  exit(1);
+  switch(kind){
+  case TypeKind::TYPE_NONE: return "void";
+  case TypeKind::TYPE_I64:  return "i64";
+  case TypeKind::TYPE_PTR:  return "pointer";
+  case TypeKind::TYPE_F64: 
+  case TypeKind::TYPE_CHAR:
+  case TypeKind::TYPE_ARRAY:
+  case TypeKind::TYPE_STRUCT:
+  case TypeKind::TYPE_ENUM:
+  case TypeKind::TYPE_PROC:
+  case TypeKind::TYPE_UNSOLVED:
+  default:
+    fprintf(stderr,
+	    "ERROR: unreachable: typekind_cstr(TypeKind kind).\n");
+    exit(1);
+  }
+
 }
 // TODO: create
 struct Type{
@@ -388,6 +428,8 @@ Expr* expr_make_cmp(Expr* lhs, Expr* rhs, EXPR_CMP_KIND op){
 }
 EXPR_BINARY_OP_KIND make_expr_binary_op_kind(){
   if(is_token(TOKEN_PLUS)) return EXPR_BINARY_OP_KIND::OP_KIND_PLUS;
+  if(is_token(TOKEN_TAKEAWAY)) return EXPR_BINARY_OP_KIND::OP_KIND_MINUS;
+  
   printf("ERROR: undefined binary operation symbol.\n");
   exit(1);
 }
@@ -414,6 +456,7 @@ Expr* expr_int(int val){
   };
 }
 void print_expr(Expr* e){
+  if(!e) return;
   switch(e->kind){
   case EXPR_BINARY_OP:
     printf("( ");
