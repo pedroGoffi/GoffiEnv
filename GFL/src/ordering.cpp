@@ -158,7 +158,7 @@ ResolvedExpr* order_expr(Expr* e){
     }
   } break;
   case EXPRKIND_PROC_CALL: {
-    const char* p_name = e->as.Call.p_name;
+    const char* p_name = e->as.call.p_name;
     Sym* proc_sym = sym_get(p_name);
     // The procedure exists ?
     if(!proc_sym){
@@ -170,18 +170,18 @@ ResolvedExpr* order_expr(Expr* e){
     }
     // the call match args and the procedure declaration is equal ?
     ProcArgs* proc_args = proc_sym->decl->as.procDecl.args;
-    if(e->as.Call.args_size != proc_args->argsList_size){
+    if(e->as.call.args_size != proc_args->argsList_size){
       fprintf(stderr,
 	      "ERROR: expected %zu arguments for the procedure '%s', but got %zu.\n",
 	      proc_args->argsList_size,
 	      proc_sym->name,
-	      e->as.Call.args_size);
+	      e->as.call.args_size);
       exit(1);
     }
     
-    for(size_t i=0; i < e->as.Call.args_size; ++i){
+    for(size_t i=0; i < e->as.call.args_size; ++i){
       // the arguments is the same type ?
-      ResolvedExpr* arg = order_expr(e->as.Call.args[i]);
+      ResolvedExpr* arg = order_expr(e->as.call.args[i]);
       Type* expected_type = proc_args->argsList[i]->type;
       type_check(expected_type,
 		 arg->type,

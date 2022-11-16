@@ -4,7 +4,7 @@
 FILE* fd = NULL;
 
 inline void gen_type(Type* type);
-inline void gen_stmt_list(StmtList* block);
+inline void gen_cstmt_list(StmtList* block);
 const char* std_includes[] = {
   "<iostream>",
   "<cstring>",
@@ -12,10 +12,9 @@ const char* std_includes[] = {
   "<cstdarg>",
   "<cstdint>",
   "<cstdlib>",  
-  "\"std/gfl.cpp\""
 };
 #define genf(...) fprintf(fd, __VA_ARGS__)
-void gen_expr(Expr* expr){
+void gen_cexpr(Expr* expr){
   switch(expr->kind){
   case EXPRKIND_INT:
     genf("%i", expr->as.INT);
@@ -24,54 +23,54 @@ void gen_expr(Expr* expr){
     genf("%s", expr->name);
     break;
   case EXPRKIND_PROC_CALL:
-    genf("%s",expr->as.Call.p_name);
+    genf("%s",expr->as.call.p_name);
     {
       genf("(");
-      for(size_t i=0;i<buf__len(expr->as.Call.args);++i){
+      for(size_t i=0;i<buf__len(expr->as.call.args);++i){
 	genf((i>0)?", ":"");
-        gen_expr(expr->as.Call.args[i]);
+        gen_cexpr(expr->as.call.args[i]);
       }
       genf(")");
     }
     break;
   case EXPRKIND_REASIGN:
-    gen_expr(expr->as.Reasign.from);    
+    gen_cexpr(expr->as.Reasign.from);    
     genf("=");
-    gen_expr(expr->as.Reasign.to);
+    gen_cexpr(expr->as.Reasign.to);
     genf(";");    
     break;
   case EXPRKIND_CAST:
     genf("((");
     gen_type(expr->as.Cast.type->type);
     genf(")");
-    gen_expr(expr->as.Cast.expr);
+    gen_cexpr(expr->as.Cast.expr);
     genf(")");
     break;
   case EXPRKIND_STRING_LITERAL:
-    genf("\"%s\"", expr->name);
+    genf("\"%s\"", expr->as.STRING);
     break;
   case EXPR_BINARY_OP:
     genf("(");
-    gen_expr(expr->as.BinaryOp.lhs);
+    gen_cexpr(expr->as.BinaryOp.lhs);
     genf("%s", human_expr_binary_op_kind(expr->as.BinaryOp.op));
-    gen_expr(expr->as.BinaryOp.rhs);    
+    gen_cexpr(expr->as.BinaryOp.rhs);    
     genf(")");
     break;
   case EXPR_COMPARASION:
     genf("((");
-    gen_expr(expr->as.comparasion.lhs);
+    gen_cexpr(expr->as.comparasion.lhs);
     genf(")%s(", human_expr_cmp_kind(expr->as.comparasion.op));
-    gen_expr(expr->as.comparasion.rhs);
+    gen_cexpr(expr->as.comparasion.rhs);
     genf("))");    
     break;
   case EXPRKIND_ADDROF_NAME:
     genf("&(");
-    gen_expr(expr->as.addr_of);
+    gen_cexpr(expr->as.addr_of);
     genf(")");    
     break;
   case EXPRKIND_DERREF_NAME:
     genf("*(");
-    gen_expr(expr->as.derref);
+    gen_cexpr(expr->as.derref);
     genf(")");
     break;
   default:
@@ -82,9 +81,8 @@ void gen_expr(Expr* expr){
 }
 inline void gen_type(Type* type){
   switch(type->kind){
-    
   case TypeKind::TYPE_I64:
-    genf("int64_t");
+    genf("int");
     break;
   case TypeKind::TYPE_F64:
     genf("double");
@@ -98,7 +96,7 @@ inline void gen_type(Type* type){
     gen_type(type->array.base);
     genf("[");
     if(type->array.size){
-      //gen_expr(type->array.array_size);
+      //gen_cexpr(type->array.array_size);
     }
     genf("]");
     break;
@@ -120,7 +118,7 @@ void gen_var(Var* var){
   genf(" %s", var->type_field->name);
   if(var->expr){
     genf("=");
-    gen_expr(var->expr);
+    gen_cexpr(var->expr);
   }
   genf(";\n");
 }
@@ -135,40 +133,40 @@ void gen_proc_args(ProcArgs* args){
   }
 }
 
-void gen_stmt(Stmt* stmt){
+void gen_cstmt(Stmt* stmt){
   switch(stmt->kind){
   case STMTKIND_RETURN:
     genf("return ");
-    gen_expr(stmt->as.expr);
+    gen_cexpr(stmt->as.expr);
     genf(";\n");
     break;
   case STMTKIND_LOCAL_VAR:{
     gen_var(stmt->as.var);
   } break;
   case STMTKIND_EXPR:
-    gen_expr(stmt->as.expr);
+    gen_cexpr(stmt->as.expr);
     genf(";\n");
     break;
   case STMTKIND_IF: {
     // if(!(expr)) goto END
     //
     genf("if(");
-    gen_expr(stmt->as.__if.expr);
+    gen_cexpr(stmt->as.__if.expr);
     genf("){\n");
-    gen_stmt_list(stmt->as.__if.block);
+    gen_cstmt_list(stmt->as.__if.block);
     genf("}\n");
     if(stmt->as.__if.elif_nodes){
       for(size_t i = 0; i < stmt->as.__if.elif_nodes->nodes_size; ++i ){
 	genf("else if (");
-	gen_expr(stmt->as.__if.elif_nodes->node_expr[i]);
+	gen_cexpr(stmt->as.__if.elif_nodes->node_expr[i]);
 	genf("){");
-	gen_stmt_list(stmt->as.__if.elif_nodes->node_block[i]);
+	gen_cstmt_list(stmt->as.__if.elif_nodes->node_block[i]);
 	genf("}\n");	
       }
     }
     if(stmt->as.__if.else_block){
       genf("else{");
-      gen_stmt_list(stmt->as.__if.else_block);
+      gen_cstmt_list(stmt->as.__if.else_block);
       genf("}\n");
     }
   } break;
@@ -176,9 +174,9 @@ void gen_stmt(Stmt* stmt){
     // TODO: pre-compile the label number for nested ifs
 
     genf("while(");
-    gen_expr(stmt->as.__while.expr);
+    gen_cexpr(stmt->as.__while.expr);
     genf("){\n");
-    gen_stmt_list(stmt->as.__while.block);
+    gen_cstmt_list(stmt->as.__while.block);
     genf("}\n");
   } break;
   default:
@@ -186,9 +184,9 @@ void gen_stmt(Stmt* stmt){
     exit(1);
   }
 }
-inline void gen_stmt_list(StmtList* block){
+inline void gen_cstmt_list(StmtList* block){
   for(size_t i=0; i<block->stmts_size; ++i){
-    gen_stmt(block->stmts[i]);
+    gen_cstmt(block->stmts[i]);
   }
 }
 void gen_cpp_from_ast_node(AST_NODE node){
@@ -203,13 +201,14 @@ void gen_cpp_from_ast_node(AST_NODE node){
   case DeclKind::DECL_VAR:{
     Var* var = new Var{
       node->as.varDecl.type_field,
+      node->as.varDecl.offset,
       node->as.varDecl.expr
+      
     };
     gen_var(var);
     break;
   }
-  case DeclKind::DECL_PROC:{
-    printf("at declkind_proc\n");
+  case DeclKind::DECL_PROC:{   
     gen_type(node->as.procDecl.ret_type);
     genf(" %s", node->name);
     { // gen the '(' args ')' stuff
@@ -220,7 +219,7 @@ void gen_cpp_from_ast_node(AST_NODE node){
     
     if(node->as.procDecl.block){ // gen the procedure body
       genf("{\n");
-      gen_stmt_list(node->as.procDecl.block);    
+      gen_cstmt_list(node->as.procDecl.block);    
       genf("}\n");
     } else {
       genf(";\n");
@@ -238,7 +237,9 @@ void gen_cpp_from_ast_node(AST_NODE node){
 
 void gen_cpp_file_from_ast(AST_ROOT ast, const char* output_fp)
 {
-  fd = fopen(output_fp, "wb");
+  char buff[258];
+  sprintf(buff, "%s.cpp", output_fp);
+  fd = fopen(buff, "wb");
   assert(fd);
   
   for(auto& inc: std_includes){

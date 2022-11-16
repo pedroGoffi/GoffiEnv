@@ -10,8 +10,6 @@
 #include "./src/cpp_dump.cpp"
 #include "./src/compiler.cpp"
 #include "./src/assembler.cpp"
-#include "../GFSL2/src/gfsl.cpp"
-#include "../GFSL2/src/typechecker.cpp"
 
 enum CO_OPT{
   NONE,
@@ -20,7 +18,18 @@ enum CO_OPT{
   GENERATE_ASM_CODE,
   SIMULATE_GFM,
 };
+void CompileAsmToBinary(const char* outfp){
+  char buff[258];
+#define CMD(...)				\
+  sprintf(buff, __VA_ARGS__);			\
+  printf("[CMD]: %s\n", buff);			\
+  system(buff);
 
+  CMD("nasm -felf64 %s -o __TRASH__.o", outfp);
+  CMD("ld __TRASH__.o -o %s.bin", outfp);
+  CMD("rm __TRASH__.o");
+#undef CMD
+}
 int main(int argc, char** argv){
   const char*  const program = shift(&argc, &argv);
   const char*  input_fp  = argv[0];
@@ -59,22 +68,9 @@ int main(int argc, char** argv){
     return 1;
   }
   
-  AST_ROOT first_ast   = parser_run_code(entry_content);
-  AST_ROOT ordered_ast = order_ast(first_ast);
-  assembly_ast_into_gfsl(ordered_ast);
-  
-  // some clean-up
-  buf__free(first_ast);
-
-  print_ast(ordered_ast);
-
-  gfsl_vr vr = {};
-  gfsl_cross_reference(&vr);
-  //TODO: in future typecheck_program(&vr);
-  gfsl_compile_program(&vr, output_fp);
-  compile_asm_to_binary(output_fp);
-  (void) compiler_mode;
-  (void) debug_mode;
+  AST_ROOT      ast   = parser_run_code(entry_content);
+  print_ast(ast);
+  AssemblerAST(ast, output_fp);
   return 0;   
 }
 #endif /* __main */

@@ -1,0 +1,16 @@
+// Obs: strings ainda nao estao implementadas por completo
+proc main(){
+  var is_gfl    : i64 = 1;
+  var is_not_gfl: i64 = 1;
+  
+  if is_gfl{
+    __print(10);
+  }
+  elif is_not_gfl {
+    __print(100); 
+  }
+  else {
+    __print(1000); 
+  }
+  return 0;
+}

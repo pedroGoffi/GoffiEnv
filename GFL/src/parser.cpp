@@ -10,6 +10,8 @@
 #include "./ast.cpp"
 #include "./token.cpp"
 #include "./grammar.cpp"
+#include "./ordering.cpp"
+AST_ROOT parser_run_code(const char* src);
 Expr* parse_plus_minus();
 Expr* parse_e0();
 Expr* parse_e1();
@@ -33,10 +35,16 @@ TypeSpec*  parse_proc_return();
 Decl* parse_proc_def();
 Decl* parse_struct_def();
 Decl* parse_typedef();
-Decl* parse_cimport();
+
 Elif* parse_elif_nodes();
 Stmt* parse_if();
 void parser_run();
+Proc* current_proc = NULL;
+void current_proc_reserve_memory(Var* var){
+  assert(current_proc);
+  current_proc->stack_allocation += sizeof_type(var->type_field->type);
+}
+
 extern void fatal(const char *fmt, ...);
 // TODO: expand the exp logic
 /* parse_expr logic:
@@ -92,18 +100,18 @@ Expr *parse_e0(){
     const char* NAME = consume().name;    
     if(is_token(TOKEN_OPEN_R_PAREN)){
       e->kind = EXPRKIND_PROC_CALL;
-      e->as.Call.p_name = NAME;
+      e->as.call.p_name = NAME;
       next_token();
       Expr **args = NULL;
-      e->as.Call.args_size = 0; 
+      e->as.call.args_size = 0; 
       while(!is_token(TOKEN_CLOSE_R_PAREN)){
-	if(e->as.Call.args_size > 0){
+	if(e->as.call.args_size > 0){
 	  MustExpect(TOKEN_COMMA);
 	}
 	buf__push(args, (parse_expr()));
-        e->as.Call.args_size++;
+        e->as.call.args_size++;
       }      
-      e->as.Call.args = args;
+      e->as.call.args = args;
       MustExpect(TOKEN_CLOSE_R_PAREN);
       return e;
     }
@@ -151,7 +159,7 @@ Expr* parse_e1(){
   }
   else if(expect_token(TOKEN_STAR)){
     e->kind      = EXPRKIND_DERREF_NAME;    
-    e->as.derref = parse_expr();
+    e->as.derref = parse_e1();
   }
   else if(expect_token(TOKEN_AMPERSAND)){
     e->kind =  EXPRKIND_ADDROF_NAME;
@@ -179,9 +187,7 @@ Expr* parse_logic(){
   Expr* e = new Expr;
   e = parse_e2();
   if(expect_token(TOKEN_EQ)){
-    e->as.Reasign.from = expr_make_name(e);
-    e->kind = EXPRKIND_REASIGN;
-    e->as.Reasign.to = parse_expr();          
+    e = expr_reasign(e, parse_expr());
   }
   return e;
 }
@@ -221,6 +227,7 @@ Type* parse_type(){
 
   if(expect_token(TOKEN_STAR)){
     type->kind     = TYPE_PTR;
+    type->ptr.base = new Type;
     type->ptr.base = parse_type();
     return type;
   }
@@ -239,6 +246,7 @@ Type* parse_type(){
     MustExpect(TOKEN_CLOSE_S_PAREN);
     return t;
   }
+  type->size = sizeof_type(type);
   return type;
 }
 TypeField* parse_typefield(){
@@ -272,6 +280,7 @@ Var*  parse_var_def(){
   Var* v = new Var;
   v->type_field = parse_typefield();
   v->expr = NULL;
+  v->offset = v->type_field->type->size;
   if(expect_token(TOKEN_EQ)){
     v->expr = parse_expr();
   }  
@@ -380,6 +389,7 @@ Stmt* parse_stmt(){
   else if(expect_name(VAR_KEYWORD)){
     s->kind = STMTKIND_LOCAL_VAR;
     s->as.var = parse_var_def();
+    current_proc_reserve_memory(s->as.var);
   }
   else if(token_is_name(WHILE_KEYWORD)){
     s = parse_while();
@@ -438,8 +448,10 @@ Decl* parse_proc_def(){
   Decl* proc = new Decl;
   proc->kind = DeclKind::DECL_PROC;
   proc->name = consume().name;
+  proc->as.procDecl.name = proc->name;
   proc->as.procDecl.args = parse_proc_args();
-  proc->as.procDecl.ret_type = NULL;
+  current_proc = &proc->as.procDecl;
+  proc->as.procDecl.stack_allocation = 0;
   // TODO: make a uncomplete type
   if(is_token(TOKEN_DOUBLE_DOT)){
     next_token();    
@@ -459,6 +471,7 @@ Decl* parse_proc_def(){
     fprintf(stderr, "ERROR: could not parse the procedure.\n");
     exit(1);
   }
+  current_proc = NULL;
   return proc;
 }
 
@@ -478,26 +491,7 @@ Decl* parse_struct_def(){
   dec->as.structDecl.fields = fields;
   return dec;
 }
-Decl* parse_cimport(){
-  assert(token.kind == TOKEN_NAME);
-  next_token();
-  Decl* cimport = new Decl;
-  cimport->kind = DeclKind::DECL_CIMPORT;
-  if(expect_token(TOKEN_LESS)){
-    assert(token.kind == TOKEN_NAME);
-    cimport->as.cimportDecl.FILENAME = consume().name;
-    cimport->as.cimportDecl.isStd = true;
-    MustExpect(TOKEN_GREATER);
-  } else if (expect_token(TOKEN_STRING)){
-    printf("peeking local path is not implemented\n");
-    exit(1);
-  }
-  else {
-    syntax_error("#cimport expects \"FILENAME\" or <FILENAME>\n");
-    exit(1);
-  }
-  return cimport;
-}
+
 Decl* parse_typedef(){
   Type* type       = parse_type();
   Type* equivalent = parse_type();
@@ -507,6 +501,23 @@ Decl* parse_typedef(){
   Typedef->as.Typedef.type       = type;
   Typedef->as.Typedef.type_equivalent = equivalent;
   return Typedef;
+}
+Decl** parse_import(){
+  MustExpectName("import");
+  printf("PRASING IMPORT\n");
+  const char* file_path = token.name;
+  const char* last_str = stream;
+  const char* file_path_content = get_file_text(file_path);
+  if(!file_path_content){
+    fprintf(stderr,
+	    "ERROR: could not open the file: %s.\n", file_path);
+    exit(1);
+  }
+  init_stream(file_path_content);
+  Decl** file_ast = parser_run_code(file_path_content);
+  init_stream(last_str);
+  //stream = last_str;
+  return file_ast;
 }
 Decl* parse_decl(){
   if(expect_token(TOKEN_AT_SIGN)){
@@ -534,24 +545,13 @@ Decl* parse_decl(){
     fatal("parsing unions are not implemented yet\n");
     exit(1);
   }
-  else if(expect_token(TOKEN_HASHTAG)){
-    if(token_is_name("cimport")){      
-      return parse_cimport();
-    }
-    else if(token_is_name("import")){
-      printf("includes are not implemented yet\n");
-      exit(1);
-    }
-    syntax_error("unexpected compiler time procedure\n");
-    exit(1);
-  }  
   else if(is_token(TOKEN_NAME)){
     const char* tk_name = consume().name;
     if(expect_token(TokenKind::TOKEN_ACCESS_FIELD)){
-      Stmt* macro_body = parse_stmt();
+      Expr* macro_body = parse_expr();
       Macro macro = {
 	.name = tk_name,
-	.stmt = macro_body
+	.expr = macro_body
       };
       GFL_Macros_push(macro);
       return NULL;
@@ -619,11 +619,30 @@ AST_ROOT parser_run_code(const char* src){
   init_stream(src);
   AST_ROOT ast = NULL;
   while(*stream){
-    Decl* node = parse_decl();
-    if(node){
-      buf__push(ast, node);
+    if(expect_token(TOKEN_HASHTAG)){
+      
+      if(token_is_name("import")){
+        Decl** file_ast = parse_import();
+	// assert(file_ast);
+	for(size_t i=0; i < buf__len(file_ast); ++i){
+	  buf__push(ast, file_ast[i]);
+	}
+      }
+      else {
+	fprintf(stderr,
+		"ERROR: unexpected pre-processor instruction: %s.\n",
+		token.name);
+	exit(1);
+      }
     }
+    else {
+      Decl* node = parse_decl();
+      if(node){
+	buf__push(ast, node);	
+      }            
+    }
+  
   }
-  return ast;
+  return order_ast(ast);
 }
 #endif /* __parser */

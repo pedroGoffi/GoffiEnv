@@ -9,12 +9,14 @@
 
 typedef struct Stmt Stmt;
 typedef struct StmtList StmtList;
+typedef StmtList Block;
 typedef struct Var Var;
 typedef struct Proc Proc;
 typedef struct Type Type;
 typedef struct TypeField TypeField;
 typedef struct switchList switchList;
 typedef struct Expr Expr;
+typedef struct Call Call;
 typedef struct _FieldAccess _FieldAccess;
 typedef struct Elif Elif;
 typedef struct ProcArgs ProcArgs;
@@ -32,7 +34,7 @@ void __ident(){
 const char* human_type(Type* type);
 void print_typespec(TypeSpec* t);
 void print_type(Type* t);
-void print_stmt_list(StmtList* b);
+void print_stmt_list(Block* b);
 
 typedef enum ExprKind{
   EXPRKIND_NONE,
@@ -88,6 +90,11 @@ const char* human_expr_cmp_kind(EXPR_CMP_KIND kind){
     
   }
 }
+struct Call{
+  const char* p_name;
+  Expr** args;
+  size_t args_size;
+};
 struct Expr{
   ExprKind kind;
   const char* name;
@@ -109,11 +116,12 @@ struct Expr{
       TypeSpec* type;
       Expr* expr;     
     } Cast;
-    struct{
-      const char* p_name;
-      Expr** args;
-      size_t args_size;
-    } Call;
+    Call call;
+    //struct{
+    //  const char* p_name;
+    //  Expr** args;
+    //  size_t args_size;
+    //} Call;
     struct{
       Expr* from;
       Expr* to;
@@ -133,7 +141,13 @@ struct Expr{
     Expr* addr_of;
   } as;  
 };
-
+const char* get_name_of_reasign(Expr* e){  
+  if(e->kind == EXPRKIND_NAME){
+    return e->name;
+  }
+  assert(e->kind == EXPRKIND_DERREF_NAME);
+  return get_name_of_reasign(e->as.Reasign.from);
+}
 
 typedef enum Stmtkind{
   STMTKIND_RETURN,
@@ -154,37 +168,38 @@ struct Stmt{
   Stmtkind kind;
   union{
     struct{
-      Expr*     expr;
-      StmtList* block;
-      Elif*     elif_nodes;
-      StmtList* else_block;
+      Expr*   expr;
+      Block*  block;
+      Elif*   elif_nodes;
+      Block*  else_block;
     } __if;
     struct{
-      Expr*     expr;
-      StmtList* block;
+      Expr*   expr;
+      Block*  block;
     } __while;
     struct{
       Expr*     cond;
       switchList* node;
     } __switch;
-    Var       *var;
-    StmtList* stmts;
-    Expr*     expr;      
+    Var     *var;
+    Block*  stmts;
+    Expr*   expr;      
   } as;
 };
 struct Var{
   TypeField* type_field;
+  size_t     offset;
   Expr*      expr;
 };
 struct switchList{
-  Expr**     cond;
-  StmtList** nodes;
-  size_t     nodes_size;
+  Expr**  cond;
+  Block** nodes;
+  size_t  nodes_size;
 };
 struct Elif{
-  Expr**      node_expr;
-  StmtList**  node_block;
-  size_t      nodes_size;
+  Expr**   node_expr;
+  Block**  node_block;
+  size_t   nodes_size;
 };
 struct StmtList{
   Stmt**  stmts;
@@ -193,6 +208,7 @@ struct StmtList{
 typedef enum TypeKind{
   TYPE_NONE,
   TYPE_I64,
+  TYPE_BOOL,
   TYPE_F64,
   TYPE_CHAR,
   TYPE_PTR,
@@ -205,7 +221,7 @@ typedef enum TypeKind{
 
 struct Macro{
   const char* name;
-  Stmt*       stmt;
+  Expr*       expr;
 };
 
 Macro* GFL_macros = NULL;
@@ -238,6 +254,7 @@ TypeSpecKind TypeSpecKind_by_cstr(const char* type){
   DOIF_TYPE("i64",  TYPE_I64);
   DOIF_TYPE("f64",  TYPE_F64);
   DOIF_TYPE("char", TYPE_CHAR);
+  DOIF_TYPE("bool", TYPE_BOOL);
 #undef DOIF_TYPE
   return TYPE_UNSOLVED;
 }
@@ -263,6 +280,7 @@ const char* typekind_cstr(TypeKind kind){
 // TODO: create
 struct Type{
   TypeKind kind;
+  size_t   size;
   const char* name;
   union{
     struct{
@@ -283,7 +301,90 @@ struct Type{
     } proc;
   };
 };
-
+Type* Type_none(){
+  auto* res = new Type;
+  res->kind = TYPE_NONE;
+  return res;
+}
+Type* Type_int(){
+  auto* res = new Type;
+  res->kind = TYPE_I64;
+  return res;
+}
+Type* Type_char(){
+  auto* res = new Type;
+  res->kind = TYPE_CHAR;
+  return res;
+}
+Type* Type_ptr(Type* base){
+  auto* res     = new Type;
+  res->kind     = TYPE_PTR;
+  res->ptr.base = base;
+  return res;
+}
+Type* Type_ptr_copy(Type* ptr){
+  assert(ptr->kind == TYPE_PTR);
+  auto* res = new Type;
+  res->kind = TYPE_PTR;
+  res->ptr.base = new Type;
+  memcpy(res->ptr.base, ptr->ptr.base, sizeof(*ptr->ptr.base));
+  return res;
+}
+int  sizeof_type(Type* type){
+  switch(type->kind){
+  case TypeKind::TYPE_I64:  return 4;
+  case TypeKind::TYPE_PTR:  return 8;
+  case TypeKind::TYPE_BOOL: return 1;
+    
+  case TypeKind::TYPE_F64: 
+  case TypeKind::TYPE_CHAR:
+  case TypeKind::TYPE_ARRAY:
+  case TypeKind::TYPE_STRUCT:
+  case TypeKind::TYPE_ENUM:
+  case TypeKind::TYPE_PROC:
+  case TypeKind::TYPE_UNSOLVED:
+    fprintf(stderr,
+	    "ERROR: unhandled sizeof_type.\n");
+    exit(1);
+  case TypeKind::TYPE_NONE:
+    fprintf(stderr,
+	    "ERROR: type void does not have a size.\n");
+    exit(1);
+  }
+  return 4;
+}
+bool Type_cmp(Type* a, Type* b){
+  if(a->kind == TYPE_PTR and b->kind == TYPE_PTR){
+    return Type_cmp(a->ptr.base, b->ptr.base);
+  }
+  assert(a);
+  assert(b);
+  return a->kind == b->kind;
+}
+Type* derref_type(Type* type){
+  switch(type->kind){
+  case TypeKind::TYPE_NONE:
+  case TypeKind::TYPE_I64:
+  case TypeKind::TYPE_F64:
+  case TypeKind::TYPE_CHAR:
+    return NULL;
+  case TypeKind::TYPE_PTR: 
+    assert(type->ptr.base);
+    return type->ptr.base;
+  case TypeKind::TYPE_UNSOLVED:
+    fprintf(stderr,
+	    "ERROR: could not solve Type during Parsing.\n");
+    exit(1);
+  case TypeKind::TYPE_ARRAY:
+  case TypeKind::TYPE_STRUCT:
+  case TypeKind::TYPE_ENUM:
+  case TypeKind::TYPE_PROC:
+  default:
+    fprintf(stderr,
+	    "ERROR: unreachable derref_type(Type* type).\n");
+    exit(1);
+  }
+}
 const char* human_type(Type* type){
   switch(type->kind){
   case TYPE_I64:
@@ -309,6 +410,11 @@ const char* human_type(Type* type){
   default:
     error_here("unhandled type kind.\n");
   }
+}
+bool Type_is_byte_related(Type* type){
+  printf("Type_is_byte_related(Type* type) :: %s\n",
+	 human_type(type));
+  return type->kind == TYPE_CHAR;
 }
 // TODO: make a short version of this
 
@@ -345,7 +451,22 @@ Type* type_ptr(Type* base){
   buf__push(cached_ptr_types, new_cached);
   return ptr;
 }
-
+Type* Type_clone(Type* t){
+  auto* res = type_alloc(t->kind);
+  switch(t->kind){
+  case TYPE_PTR:
+    res->ptr.base = Type_clone(t->ptr.base);
+    break;
+  case TYPE_CHAR:
+  case TYPE_I64:
+  case TYPE_F64:
+    break;
+  default:
+    printf("ERROR: Type_clone(Type* t).\n");
+    exit(1);
+  }
+  return res;
+}
 
 struct TypeField{
   const char* name;
@@ -367,7 +488,9 @@ enum DeclKind{
   DECL_CIMPORT
 };
 struct Proc{
+  const char* name;
   ProcArgs  *args;
+  size_t    stack_allocation;
   Type      *ret_type;
   StmtList  *block;
 };
@@ -376,16 +499,7 @@ struct Decl{
   const char* name;
   union{
     Var  varDecl;
-    //Proc* procDecl;
-    //struct{
-    //  Type*     type;
-    //  Expr*     expr;
-    //} varDecl;
-    struct{
-      ProcArgs  *args;
-      Type      *ret_type;
-      StmtList  *block;
-    } procDecl;
+    Proc procDecl;    
     struct{
       TypeSpec **fields;
       size_t     fields_size;
@@ -400,6 +514,7 @@ struct Decl{
     } Typedef;
   } as;
 };
+
 Decl* decl_var(const char* name, Type* type, Expr* expr){
   (void) name;
   (void) type;
@@ -450,10 +565,18 @@ Expr* expr_make_binary(Expr* lhs, Expr* rhs, EXPR_BINARY_OP_KIND op){
 Expr* expr_int(int val){
   return new Expr{
     .kind = EXPRKIND_INT,
-    .as   = {
+    .name = "<built_int_integer>",
+    .as   = {      
       .INT = val
     }
   };
+}
+Expr* expr_reasign(Expr* from, Expr* to){
+  Expr* rs = new Expr;
+  rs->as.Reasign.from = from;
+  rs->as.Reasign.to   = to;
+  rs->kind = EXPRKIND_REASIGN;
+  return rs;
 }
 void print_expr(Expr* e){
   if(!e) return;
@@ -494,10 +617,10 @@ void print_expr(Expr* e){
     break;
   case EXPRKIND_PROC_CALL:
     printf("call(%s[",
-	   e->as.Call.p_name);
-    for(size_t i=0;i<buf__len(e->as.Call.args);++i){
+	   e->as.call.p_name);
+    for(size_t i=0;i<buf__len(e->as.call.args);++i){
       printf((i>0)?", ":"");
-      print_expr(e->as.Call.args[i]);
+      print_expr(e->as.call.args[i]);
     }
     printf("])");
     break;
@@ -669,7 +792,7 @@ void print_stmt(Stmt* s){
     exit(1);
   }
 }
-void print_stmt_list(StmtList* b){
+void print_stmt_list(Block*  b){
   ident++;
   for(size_t i = 0; i < b->stmts_size; ++i){
     ident();

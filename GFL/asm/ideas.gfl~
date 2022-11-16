@@ -1,0 +1,9 @@
+proc main(){
+  var x: i64;
+  x = 10;   
+  push 10 COMPILE_EXPR
+  pop  rax
+  mov [rsp - 18], rax
+  
+  
+}
