@@ -3,6 +3,7 @@
 #define __main
 #include <iostream>
 #include <string>
+const char*  program = NULL;
 #define LEXER_HAS_LOCATION        
 #include "../common/utils.cpp"
 #include "./src/parser.cpp"
@@ -30,8 +31,9 @@ void CompileAsmToBinary(const char* outfp){
   CMD("rm __TRASH__.o");
 #undef CMD
 }
+
 int main(int argc, char** argv){
-  const char*  const program = shift(&argc, &argv);
+  program = shift(&argc, &argv);
   const char*  input_fp  = argv[0];
   const char*  output_fp = "out.asm";
   enum CO_OPT compiler_mode = CO_OPT::SIMULATE_GFM;
@@ -61,16 +63,13 @@ int main(int argc, char** argv){
     }
 #undef is_str
   }  
-  const char* entry_content = get_file_text(input_fp);
-  if(!entry_content){
-    usage(stderr, program);
-    printf("error: could not open the file: `%s`\n", input_fp);
-    return 1;
-  }
   
-  AST_ROOT      ast   = parser_run_code(entry_content);
-  print_ast(ast);
-  AssemblerAST(ast, output_fp);
+  
+  
+  parse_file(input_fp);
+  //print_ast(modules[0]->ast);
+  AssemblerAST(output_fp);
+  CompileAsmToBinary(output_fp);
   return 0;   
 }
 #endif /* __main */

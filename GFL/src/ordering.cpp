@@ -1,3 +1,4 @@
+// TODO: get rid of type checking at this phase and move to assembly stage
 #ifndef __order__
 #define __order__
 #include "./ast.cpp"
@@ -88,30 +89,34 @@ void order_decl_var(Decl* decl){
   Type* var_type = order_type(decl->as.varDecl.type_field->type);
   if(decl->as.varDecl.expr){
     ResolvedExpr* rexpr = order_expr(decl->as.varDecl.expr);
-    type_check(var_type, rexpr->type, "at var declaration");    
+    (void) rexpr;
+    printf("[WARNING]: type check is not on for testing.\n");
+    //type_check(var_type, rexpr->type, "at var declaration");    
   }
 }
 void order_decl_proc(Decl* decl){
   assert(decl->kind == DeclKind::DECL_PROC);
+
   if(STR_CMP(decl->name, "main")){
-    if(decl->as.procDecl.ret_type){
+    TypeKind ret_main_kind = decl->as.procDecl.ret_type->kind;
+    if(ret_main_kind != TYPE_NONE and ret_main_kind != TYPE_I64){
       fprintf(stderr,
-	      "ERROR: the 'main' procedure does not support return type.\n");
+	      "ERROR: the 'main' procedure does not support return type that is not i64.\n");
       exit(1);
     }
     ProcArgs *args = decl->as.procDecl.args;
-    if(args->argsList_size > 0){
-      if(args->argsList_size != 2){
+    if(buf__len(args->vars) > 0){
+      if(buf__len(args->vars) != 2){
 	fprintf(stderr,
-		"ERROR: the 'main' procedure only supports 2 or 0 arguments.\n")	;
+		"ERROR: the 'main' procedure only supports 2 or 0 arguments.\n");
 	exit(1);
       }
-      if(args->argsList[0]->type->kind != TYPE_I64){
+      if(args->vars[1]->type_field->type->kind != TYPE_I64){
 	fprintf(stderr,
 		"ERROR: the first argument on the 'main' procedure must be an i64.\n");
 	exit(1);	
       }
-      if(args->argsList[1]->type->kind != TYPE_PTR){
+      if(args->vars[1]->type_field->type->kind != TYPE_PTR){
 	fprintf(stderr,
 		"ERROR: the first argument on the 'main' procedure must be an pointer.\n");
 	exit(1);	
@@ -170,10 +175,10 @@ ResolvedExpr* order_expr(Expr* e){
     }
     // the call match args and the procedure declaration is equal ?
     ProcArgs* proc_args = proc_sym->decl->as.procDecl.args;
-    if(e->as.call.args_size != proc_args->argsList_size){
+    if(e->as.call.args_size != buf__len(proc_args->vars)){
       fprintf(stderr,
 	      "ERROR: expected %zu arguments for the procedure '%s', but got %zu.\n",
-	      proc_args->argsList_size,
+	      (size_t)buf__len(proc_args->vars),
 	      proc_sym->name,
 	      e->as.call.args_size);
       exit(1);
@@ -182,7 +187,7 @@ ResolvedExpr* order_expr(Expr* e){
     for(size_t i=0; i < e->as.call.args_size; ++i){
       // the arguments is the same type ?
       ResolvedExpr* arg = order_expr(e->as.call.args[i]);
-      Type* expected_type = proc_args->argsList[i]->type;
+      Type* expected_type = proc_args->vars[i]->type_field->type;
       type_check(expected_type,
 		 arg->type,
 		 "at procedure call");
@@ -229,7 +234,7 @@ void order_decl(Decl* decl){
     order_decl_struct(decl);
     break;
   case DeclKind::DECL_TYPEDEF:
-    //order_typedef(decl);
+  case DeclKind::DECL_NAMESPACE:
     break;
   case DeclKind::DECL_CIMPORT:
   case DeclKind::DECL_NONE:
@@ -277,20 +282,9 @@ void order_sym_list(){
   }
 }
 
-void init_builtin_types(){
-  for(const char* const type_name: __builtin_types__){    
-    assert(!sym_get(type_name));
-    Sym type = {
-      .name  = type_name,
-      .decl  = {},
-      .state = SymState::ORDERED
-    };
-    buf__push(sym_list, type);
-  }
-}
+
 Decl** order_ast(Decl** ast){
   // TODO: order ast is not fully implemented
-  init_builtin_types();
   for(size_t i=0; i < buf__len(ast); i++){
     sym_push(ast[i]);
   }

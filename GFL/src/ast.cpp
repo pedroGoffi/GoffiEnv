@@ -8,6 +8,7 @@
 #include "../../common/utils.cpp"
 
 typedef struct Stmt Stmt;
+typedef struct Module Module;
 typedef struct StmtList StmtList;
 typedef StmtList Block;
 typedef struct Var Var;
@@ -20,7 +21,7 @@ typedef struct Call Call;
 typedef struct _FieldAccess _FieldAccess;
 typedef struct Elif Elif;
 typedef struct ProcArgs ProcArgs;
-typedef struct TypeSpec TypeSpec;
+
 static int ident;
 #define ident() __ident()
 #define newline() printf("\n")
@@ -32,7 +33,8 @@ void __ident(){
     
 }
 const char* human_type(Type* type);
-void print_typespec(TypeSpec* t);
+void print_typefield(TypeField* t);
+void print_expr(Expr* e);
 void print_type(Type* t);
 void print_stmt_list(Block* b);
 
@@ -40,6 +42,7 @@ typedef enum ExprKind{
   EXPRKIND_NONE,
   EXPR_BINARY_OP,
   EXPR_COMPARASION,
+  EXPRKIND_NEG,
   EXPRKIND_INT,
   EXPRKIND_FLOAT,
   EXPRKIND_STRING_LITERAL,  
@@ -51,16 +54,22 @@ typedef enum ExprKind{
   EXPRKIND_REASIGN,
   EXPRKIND_FIELD_ACCESS,
   EXPRKIND_ARRAY_ACCESS,
+  EXPRKIND_LOCAL_IF,
+  EXPRKIND_NAMESPACE_GET,
 } ExprKind;
 typedef enum EXPR_BINARY_OP_KIND{
   OP_KIND_PLUS,
-  OP_KIND_MINUS,  
+  OP_KIND_MINUS,
+  OP_KIND_DIV,
+  OP_KIND_MULT
 } EXPR_BINARY_OP_KIND;
 
 const char* human_expr_binary_op_kind(EXPR_BINARY_OP_KIND kind){
   switch(kind){
   case EXPR_BINARY_OP_KIND::OP_KIND_PLUS:  return "+";
   case EXPR_BINARY_OP_KIND::OP_KIND_MINUS: return "-";
+  case EXPR_BINARY_OP_KIND::OP_KIND_DIV:   return "/";
+  case EXPR_BINARY_OP_KIND::OP_KIND_MULT:  return "*";
   default:
     printf("ERROR: undefined kind at human_expr_binary_op_kind.\n");
     exit(1);
@@ -90,18 +99,62 @@ const char* human_expr_cmp_kind(EXPR_CMP_KIND kind){
     
   }
 }
+typedef enum TypeKind{
+  TYPE_NONE,
+  TYPE_I32,
+  TYPE_I64,
+  TYPE_BOOL,
+  TYPE_F64,
+  TYPE_CHAR,
+  TYPE_PTR,
+  TYPE_ARRAY,
+  TYPE_STRUCT,
+  TYPE_ENUM,
+  TYPE_PROC,
+  TYPE_UNSOLVED,
+} TypeFieldKind;
+
+struct Type{
+  TypeKind kind;
+  size_t   size;
+  const char* name;
+  union{
+    struct{
+      Type* base;
+    } ptr;
+    struct{
+      Type* base;
+      Expr* size;      
+    } array;
+    struct{
+      TypeField* fields;
+      size_t fields_size;
+    } aggregate;
+    struct{
+      TypeField* params;
+      size_t params_size;
+      Type*  ret;
+    } proc;
+  };
+};
 struct Call{
   const char* p_name;
   Expr** args;
   size_t args_size;
 };
 struct Expr{
-  ExprKind kind;
+  ExprKind    kind;
   const char* name;
+  Type*       type;
   union{
     int    INT;
     double FLOAT;
     const char* STRING;
+    struct {
+      Expr* cond;
+      Expr* if_body;
+      Expr* else_body;
+    } local_if;
     struct{
       EXPR_BINARY_OP_KIND op;
       Expr* lhs;
@@ -113,15 +166,11 @@ struct Expr{
       Expr* rhs;
     } comparasion;
     struct{
-      TypeSpec* type;
+      TypeField* type;
       Expr* expr;     
     } Cast;
     Call call;
-    //struct{
-    //  const char* p_name;
-    //  Expr** args;
-    //  size_t args_size;
-    //} Call;
+
     struct{
       Expr* from;
       Expr* to;
@@ -136,7 +185,11 @@ struct Expr{
       const char* name;
       Expr* expr;
     } ArrayAccess;
-
+    struct {
+      const char* name;
+      Expr*       rhs;
+    } NamespaceGet;
+    Expr* expr;
     Expr* derref;
     Expr* addr_of;
   } as;  
@@ -151,6 +204,7 @@ const char* get_name_of_reasign(Expr* e){
 
 typedef enum Stmtkind{
   STMTKIND_RETURN,
+  STMTKIND_BLOCK,
   STMTKIND_BREAK,
   STMTKIND_CONTINUE,
   STMTKIND_STMT,
@@ -190,6 +244,7 @@ struct Var{
   TypeField* type_field;
   size_t     offset;
   Expr*      expr;
+  bool       passed_by_stack;
 };
 struct switchList{
   Expr**  cond;
@@ -205,19 +260,6 @@ struct StmtList{
   Stmt**  stmts;
   size_t  stmts_size;
 };
-typedef enum TypeKind{
-  TYPE_NONE,
-  TYPE_I64,
-  TYPE_BOOL,
-  TYPE_F64,
-  TYPE_CHAR,
-  TYPE_PTR,
-  TYPE_ARRAY,
-  TYPE_STRUCT,
-  TYPE_ENUM,
-  TYPE_PROC,
-  TYPE_UNSOLVED,
-} TypeSpecKind;
 
 struct Macro{
   const char* name;
@@ -245,16 +287,20 @@ inline bool GFL_MACROS_exists(const char* name){
 void GFL_Macros_push(Macro macro){
   buf__push(GFL_macros, macro);
 }
-TypeSpecKind TypeSpecKind_by_cstr(const char* type){
+TypeFieldKind TypeFieldKind_by_cstr(const char* type){
   // NOTE: STR_CMP is defined in ../../common/utils.cpp
 #define DOIF_TYPE(str, ret_type)		\
   if(STR_CMP(type, str)){			\
     return ret_type;				\
   }
+  DOIF_TYPE("i32",  TYPE_I32);
   DOIF_TYPE("i64",  TYPE_I64);
+  
   DOIF_TYPE("f64",  TYPE_F64);
   DOIF_TYPE("char", TYPE_CHAR);
   DOIF_TYPE("bool", TYPE_BOOL);
+  DOIF_TYPE("void", TYPE_NONE);
+  
 #undef DOIF_TYPE
   return TYPE_UNSOLVED;
 }
@@ -278,29 +324,7 @@ const char* typekind_cstr(TypeKind kind){
 
 }
 // TODO: create
-struct Type{
-  TypeKind kind;
-  size_t   size;
-  const char* name;
-  union{
-    struct{
-      Type* base;
-    } ptr;
-    struct{
-      Type* base;
-      Expr* size;      
-    } array;
-    struct{
-      TypeField* fields;
-      size_t fields_size;
-    } aggregate;
-    struct{
-      TypeField* params;
-      size_t params_size;
-      Type*  ret;
-    } proc;
-  };
-};
+
 Type* Type_none(){
   auto* res = new Type;
   res->kind = TYPE_NONE;
@@ -330,15 +354,19 @@ Type* Type_ptr_copy(Type* ptr){
   memcpy(res->ptr.base, ptr->ptr.base, sizeof(*ptr->ptr.base));
   return res;
 }
-int  sizeof_type(Type* type){
+
+int sizeof_type(Type* type){
   switch(type->kind){
-  case TypeKind::TYPE_I64:  return 4;
-  case TypeKind::TYPE_PTR:  return 8;
+  case TypeKind::TYPE_I32:  return 4;
+  case TypeKind::TYPE_I64:  return 8;
   case TypeKind::TYPE_BOOL: return 1;
+  case TypeKind::TYPE_CHAR: return 4;
+  case TypeKind::TYPE_PTR:  return 8;
     
-  case TypeKind::TYPE_F64: 
-  case TypeKind::TYPE_CHAR:
   case TypeKind::TYPE_ARRAY:
+    assert(type->array.size->kind == EXPRKIND_INT);
+    return sizeof_type(type->array.base) * type->array.size->as.INT;
+  case TypeKind::TYPE_F64: 
   case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
@@ -351,7 +379,7 @@ int  sizeof_type(Type* type){
 	    "ERROR: type void does not have a size.\n");
     exit(1);
   }
-  return 4;
+  return 0;
 }
 bool Type_cmp(Type* a, Type* b){
   if(a->kind == TYPE_PTR and b->kind == TYPE_PTR){
@@ -472,10 +500,7 @@ struct TypeField{
   const char* name;
   Type* type;
 };
-struct TypeSpec{
-  const char* name;
-  Type*       type;
-};
+
 
 enum DeclKind{
   DECL_NONE,
@@ -485,7 +510,8 @@ enum DeclKind{
   DECL_VAR,
   DECL_TYPEDEF,
   DECL_PROC,
-  DECL_CIMPORT
+  DECL_CIMPORT,
+  DECL_NAMESPACE,
 };
 struct Proc{
   const char* name;
@@ -494,14 +520,16 @@ struct Proc{
   Type      *ret_type;
   StmtList  *block;
 };
+
 struct Decl{
-  DeclKind kind;
+  DeclKind    kind;
   const char* name;
+  bool        used;
   union{
     Var  varDecl;
     Proc procDecl;    
     struct{
-      TypeSpec **fields;
+      TypeField **fields;
       size_t     fields_size;
     } structDecl;
     struct{
@@ -512,9 +540,56 @@ struct Decl{
       Type* type;
       Type* type_equivalent;
     } Typedef;
+    struct{
+      const char* name;
+      Decl**      decls;
+    } Namespace;
   } as;
 };
-
+struct Module {
+  const char* path;
+  Decl**      ast;
+};
+Module** modules = NULL;
+void Module_push(Module*** mods, Module* mod){
+  buf__push(*mods, mod);
+}
+Decl**   namespaces = NULL;
+Decl* namespaces_get(const char* root, const char* child=""){
+  for(size_t i=0; i < buf__len(namespaces); ++i){
+    if(STR_CMP(namespaces[i]->name, root))
+      return namespaces[i];
+  }
+  for(size_t i=0; i < buf__len(namespaces); ++i){
+    Decl** ast = namespaces[i]->as.Namespace.decls;
+    for(size_t i=0; i < buf__len(ast); ++i){
+      if(ast[i]->kind != DECL_NAMESPACE) continue;
+      if(STR_CMP(ast[i]->name, child)){
+	return ast[i];
+      }
+    }
+  }
+  return NULL;
+}
+void namespaces_push(Decl*** ns, Decl* d){
+  assert(d->name);
+  assert(!namespaces_get(d->name));  
+  buf__push(*ns, d);
+}
+Decl* namespaces_get_expr(Expr* e){
+  switch(e->kind)
+  {
+  case EXPRKIND_NAME: return namespaces_get(e->name);
+  case EXPRKIND_PROC_CALL:
+    return namespaces_get(e->as.call.p_name);
+  case EXPRKIND_NAMESPACE_GET:
+    return namespaces_get_expr(e->as.NamespaceGet.rhs);
+  default:
+    print_expr(e);
+    printf("[I-ERR]: namespaces_get_expr(Expr* e)\n");
+    exit(1);
+  }
+}
 Decl* decl_var(const char* name, Type* type, Expr* expr){
   (void) name;
   (void) type;
@@ -524,9 +599,10 @@ Decl* decl_var(const char* name, Type* type, Expr* expr){
   return {};
 }
 struct ProcArgs{
-  TypeSpec   **argsList;
-  size_t       argsList_size;
+  Var**        vars;
+  size_t       vars_size;
 };
+
 Expr* expr_make_name(Expr* f){
   Expr* r = new Expr;
   r->kind = EXPRKIND_NAME;
@@ -542,8 +618,10 @@ Expr* expr_make_cmp(Expr* lhs, Expr* rhs, EXPR_CMP_KIND op){
   return expr_cmp;
 }
 EXPR_BINARY_OP_KIND make_expr_binary_op_kind(){
-  if(is_token(TOKEN_PLUS)) return EXPR_BINARY_OP_KIND::OP_KIND_PLUS;
-  if(is_token(TOKEN_TAKEAWAY)) return EXPR_BINARY_OP_KIND::OP_KIND_MINUS;
+  if(is_token(TOKEN_PLUS))	return EXPR_BINARY_OP_KIND::OP_KIND_PLUS;
+  if(is_token(TOKEN_TAKEAWAY))	return EXPR_BINARY_OP_KIND::OP_KIND_MINUS;
+  if(is_token(TOKEN_DIV))	return EXPR_BINARY_OP_KIND::OP_KIND_DIV;
+  if(is_token(TOKEN_STAR))	return EXPR_BINARY_OP_KIND::OP_KIND_MULT;
   
   printf("ERROR: undefined binary operation symbol.\n");
   exit(1);
@@ -565,7 +643,7 @@ Expr* expr_make_binary(Expr* lhs, Expr* rhs, EXPR_BINARY_OP_KIND op){
 Expr* expr_int(int val){
   return new Expr{
     .kind = EXPRKIND_INT,
-    .name = "<built_int_integer>",
+    .name = "<built-in_integer>",
     .as   = {      
       .INT = val
     }
@@ -581,6 +659,9 @@ Expr* expr_reasign(Expr* from, Expr* to){
 void print_expr(Expr* e){
   if(!e) return;
   switch(e->kind){
+  case EXPRKIND_LOCAL_IF:
+    printf("TODO print local if\n");
+    break;
   case EXPR_BINARY_OP:
     printf("( ");
     print_expr(e->as.BinaryOp.lhs);
@@ -641,6 +722,17 @@ void print_expr(Expr* e){
     print_expr(e->as.addr_of);
     printf(")");    
     break;
+  case EXPRKIND_NEG:
+    printf("Neg(");
+    print_expr(e->as.expr);
+    printf(")");
+    break;
+  case EXPRKIND_NAMESPACE_GET:
+    printf("Get namespace '%s' [ ", e->as.NamespaceGet.name);
+    print_expr(e->as.NamespaceGet.rhs);
+    printf(" ]\n");
+    
+    break;
   case EXPRKIND_ARRAY_ACCESS:
   case EXPRKIND_FIELD_ACCESS:
   case EXPRKIND_NONE:
@@ -650,6 +742,7 @@ void print_expr(Expr* e){
   }
 }
 void print_type(Type* t){
+  if(!t) return;
   switch(t->kind){
   case TYPE_PTR:
     printf("ptr_to(");
@@ -670,9 +763,13 @@ void print_type(Type* t){
   case TYPE_NONE:
     printf("none");
     break;
+  case TYPE_I32:
+    printf("i32");
+    break;
   case TYPE_I64:
     printf("i64");
     break;
+    
   case TYPE_F64:
     printf("f64");
     break;
@@ -685,17 +782,25 @@ void print_type(Type* t){
   case TYPE_STRUCT:
   case TYPE_ENUM:
   default:
-    printf("Unexpected TypeSpecKind\n");
+    printf("Unexpected TypeFieldKind\n");
     exit(1);
   }
 }
-void print_typespec(TypeSpec* k){
+void print_typespec(TypeField* k){
   printf("[%s: ", k->name);
   print_type(k->type);
   printf("]");
 }
 void print_stmt(Stmt* s){
   switch(s->kind){
+  case STMTKIND_BLOCK:
+    printf("block [ \n");
+    ident++;
+    print_stmt_list(s->as.stmts);
+    ident--;
+    ident();
+    printf("]\n");
+    break;
   case STMTKIND_RETURN:
     printf("return ");
     print_expr(s->as.expr);
@@ -781,9 +886,15 @@ void print_stmt(Stmt* s){
     ident();
     printf(")");
     break;
-  case STMTKIND_SWITCH:
   case STMTKIND_BREAK:
+    ident();
+    printf("[kw-break]\n");
+    break;
   case STMTKIND_CONTINUE:
+    ident();
+    printf("[kw-continue]\n");
+    break;
+  case STMTKIND_SWITCH:
   case STMTKIND_STMT:
   case STMTKIND_DO_WHILE:
   case STMTKIND_FOR:
@@ -830,9 +941,10 @@ void print_decl(Decl* d){
     }
     printf("]\n");
     ident++;
-    for(size_t i = 0; i < d->as.procDecl.args->argsList_size; ++i){
+    for(size_t i = 0; i < buf__len(d->as.procDecl.args->vars); ++i){
       ident();
-      print_typespec(d->as.procDecl.args->argsList[i]);
+      Var* var = d->as.procDecl.args->vars[i];
+      print_typespec(var->type_field);
       newline();
     }
     if(d->as.procDecl.block){    
@@ -857,6 +969,8 @@ void print_decl(Decl* d){
     ident();
     printf(")");
     break;
+  case DeclKind::DECL_NAMESPACE:
+    return;
   case DeclKind::DECL_CIMPORT:
   case DeclKind::DECL_ENUM:
   case DeclKind::DECL_UNION:
@@ -866,12 +980,12 @@ void print_decl(Decl* d){
   }
   // NOTE: for now declarations can not be nested
   ident = 0;
+  printf("\n");
   //assert(ident == 0 && "THIS MIGHT BE A BUG IN THE IDENT LOGIC");
 }
 void print_ast(Decl** ast){
   for(size_t i=0; i<buf__len(ast); ++i){
     print_decl(ast[i]);
-    printf("\n");
     
   }
 }

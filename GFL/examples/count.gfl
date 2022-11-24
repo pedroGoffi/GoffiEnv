@@ -1,0 +1,7 @@
+proc main(): void {
+  var i: i64 = 0;
+  while i < 10 {
+    __print__(i);
+    i = i + 1;
+  }
+}

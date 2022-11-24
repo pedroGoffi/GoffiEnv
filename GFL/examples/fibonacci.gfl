@@ -1,0 +1,17 @@
+///#import "std/core.gfl" 
+
+FIB_LIM :: 10000
+//or var FIB_LIM: i64 = 10000;
+
+
+proc main(): void {
+  var x0: i64 = 0;
+  var x1: i64 = 1;
+  var x2: i64 = 0;
+  while x0 < FIB_LIM {
+    x0 = x1 + x2;
+    x1 = x2;
+    x2 = x0;
+    __print__(x0);
+  }
+}

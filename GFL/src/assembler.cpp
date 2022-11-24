@@ -1,11 +1,40 @@
 #ifndef __assembler
 #define __assembler
 #include "./ast.cpp"
-#define GFL_RET_STACK_CAP 4096
-static void gen_expr(Expr* expr);
 
-Var** local_vars = NULL;
-// UNIMPLEMENTED Var** global_vars = NULL; 
+// compiler behaviour vars
+static bool  load_vars = true;
+static bool  ns_ctx    = false;
+static char* ns_name   = NULL;
+
+int     DEBUG_COUNT = 0;
+#define DEBUG_OK							\
+  if(1) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
+#define unimplemented(st)				\
+  printf("UNIMEPLMENTED %s: %s\n", __FUNCTION__, #st);	\
+  exit(1);
+#define unreachable()					\
+  printf("ERROR: unrechable %s.\n", __FUNCTION__);	\
+  exit(1);
+
+int align_to(int n, int align) {
+  return (n + align - 1) / align * align;
+}
+static Type* gen_expr(Expr* expr);
+static void gen_expr_cmp(Expr* expr);
+
+size_t rbp_stack_offset = 0;
+Var**  local_vars	= NULL;
+Var**  global_vars	= NULL;
+const char** strings	= NULL;
+Proc** procs		= NULL;
+Proc* Proc_get(Proc*** procs, const char* name){
+  for(size_t i=0; i < buf__len(*procs); ++i){
+    if(STR_CMP((*procs)[i]->name, name))
+      return (*procs)[i];
+  }
+  return NULL;
+}
 Var* Var_get(Var*** vars, const char* name){
   for(size_t i=0; i < buf__len(*vars); ++i){
     if(STR_CMP((*vars)[i]->type_field->name, name)){
@@ -14,43 +43,54 @@ Var* Var_get(Var*** vars, const char* name){
   }
   return NULL;
 }
+void  Proc_push(Proc*** procs, Decl* decl){
+  assert(decl->kind == DECL_PROC);
+  if(Proc_get(procs, decl->name)){
+    fprintf(stderr,
+	    "ERROR: the procedure '%s' was already declared.\n",
+	    decl->name);
+    exit(1);
+  }
+
+  buf__push(*procs, &decl->as.procDecl);
+  
+}
+
 void Var_push(Var*** vars, Var* var){
   assert(!Var_get(vars, var->type_field->name));
-
-  buf__push(*vars, new Var{
-      .type_field = var->type_field,
-      .offset     = var->offset,
-      .expr       = var->expr
-    });
+  buf__push(*vars, var);
 }
-Var* Var_from_expr(Expr* expr){  
-  return Var_get(&local_vars, expr->name);
+Var* Var_from_expr(Expr* expr){
+  if(expr->kind != EXPRKIND_NAME){
+    unreachable();
+  }
+  Var* lv = Var_get(&local_vars, expr->name);
+  if(lv) return lv;
+  
+  Var* gv = Var_get(&global_vars, expr->name);
+  if(gv) return gv;
+  
+  unreachable();
 }
-#define unreachable()					\
-  printf("ERROR: unrechable %s.\n", __FUNCTION__);	\
-  exit(1);
 static FILE* output_file;
 static int   depth;
-
 static Decl* current_decl;
+
 static const char* argreg8[]  = {"dil", "sil", "dl", "cl", "r8b", "r9b"};
 static const char *argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
 static const char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static const char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-
+#define MAX_ARGREG64 6
 
 static int count(void) {
   static int i = 1;
   return i++;
 }
-__attribute__((format(printf, 1, 2)))
-static void println(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(output_file, fmt, ap);
-  va_end(ap);
-  fprintf(output_file, "\n");
-}
+#define println(...)				\
+  {						\
+    fprintf(output_file, __VA_ARGS__);		\
+    fprintf(output_file, "\n");			\
+  }
 static void push(void){
   println("\tpush rax");
   depth++;
@@ -68,7 +108,13 @@ static const char *reg_dx(int sz) {
   }
   unreachable();
 }
-
+static const char* word_from_size(size_t sz){
+  if(sz == 1) return "byte";
+  if(sz == 2) return "word";
+  if(sz == 4) return "dword";
+  if(sz == 8) return "qword";  
+  return "";
+}
 static const char *reg_ax(int sz) {
   switch (sz) {
   case 1: return "al";
@@ -78,95 +124,381 @@ static const char *reg_ax(int sz) {
   }
   unreachable();
 }
-static void load(Type* ty){
-  assert(ty->kind == TYPE_I64);
-  if(ty->size != 4){
+static Type* load(Type* ty){
+  switch(ty->kind){
+  case TYPE_I32:
+    println("\tmov eax, %s [eax]",
+	    word_from_size(ty->size));
+    break;
+  case TYPE_I64:
+    println("\tmov rax, %s [rax]",
+	    word_from_size(ty->size));
+    break;
+  case TYPE_PTR:
+    println("\tmov rax, %s [rax]",
+	    word_from_size(ty->size));
+    return ty->ptr.base;
+  case TYPE_CHAR:
+    println("\tmovzx eax, BYTE [eax]");
+    break;
+  case TYPE_ARRAY: break;
+  default:
     unreachable();
   }
-  println("\tmov rax, [rax]");
+  return ty;
 }
+
 static void store(Type* ty){
-  pop("rdi");
-  assert(ty->kind == TYPE_I64);
-  if(ty->size != 4){
+  // the register rax carry the var value 
+  pop("rdi"); // var register
+  switch(ty->kind){
+    
+  case TYPE_PTR: 
+  case TYPE_I64:
+  case TYPE_ARRAY:
+    println("\tmov [rdi], rax");
+    break;
+  case TYPE_CHAR:
+    println("\tmov [edi], eax");
+    break;
+  default:
     unreachable();
-  }
-  println("\tmov [rdi], rax");
+  }    
 }
 static Var* Expr_get_var(Expr* expr){
   unreachable();
 }
+static int push_callargs(Expr** args){
+  int stack=0;
+
+  for(size_t i=0; i < buf__len(args); ++i){
+    if( i >= MAX_ARGREG64 ){      
+      for(size_t j=i; j < buf__len(args); ++j){
+	gen_expr(args[j]);
+	push();
+	stack++;
+      }
+      return stack;
+    }
+    gen_expr(args[i]);
+    println("\tmov %s, rax", argreg64[i]);
+  }
+  return stack;
+}
+
 static void gen_addr(Var* var){
   TypeField* tf = var->type_field;
-  assert(tf->type->kind == TYPE_I64);
-  println("\tlea rax, QWORD [rbp - %i]", (int)var->offset);
+  switch(tf->type->kind){
+  case TYPE_PTR:
+  case TYPE_I64:    
+    println("\tlea rax, %s [rbp - %i]",
+	    word_from_size(tf->type->size),
+	    (int)var->offset);
+    
+    break;
+  case TYPE_ARRAY:
+    break;
+  case TYPE_CHAR:
+    println("\tlea eax, %s [ebp - %i]",
+	    word_from_size(tf->type->size),
+	    (int)var->offset);
+    break;
+  default:
+    unreachable();
+  }
 }
-static bool is_builin_procedure(Call* call){
-  if(STR_CMP(call->p_name, "__print")){
-    assert(call->args_size == 1);
-    gen_expr(call->args[0]);
-    println("\tmov rdi, rax");
-    println("\tcall __print");
+static void set_callargs_passed_by_stacK_range(ProcArgs* pa, size_t begin){
+  for(size_t i=begin; i < buf__len(pa->vars); ++i){
+    pa->vars[i]->passed_by_stack = true;    
+  }
+}
+static void store_callargs(ProcArgs* pa){
+  Var** vargs = pa->vars;  
+  for(size_t i=0; i < buf__len(vargs); ++i){
+    Var* arg = vargs[i];
+    if(i >= MAX_ARGREG64) {      
+      rbp_stack_offset = vargs[i - 1]->offset;
+      set_callargs_passed_by_stacK_range(pa, i);
+      break;
+    }
+ 
+    switch(arg->type_field->type->kind){
+    case TYPE_PTR:
+    case TYPE_I64:
+      println("\tmov %s [rbp - %zu], %s",
+	      word_from_size(arg->type_field->type->size),
+	      (size_t)arg->offset,
+	      argreg64[i]);
+      break;
+    default:
+      unreachable();
+    }
+  }
+  DEBUG_OK;
+}
+static void init_args(ProcArgs* pargs){
+  for(size_t i=0; i < buf__len(pargs->vars); ++i){
+    Var_push(&local_vars, pargs->vars[i]);
+  }
+}
+
+
+static bool test_make_syscall(Call* call, const char* estr, int sys_len){
+  if(STR_CMP(call->p_name, estr)){
+    assert(call->args_size == sys_len);
+    int LAST_REG = sys_len - 1;
+    for(int i = 0; i < LAST_REG; ++i){
+      gen_expr(call->args[i]);
+      println("\tmov %s, rax", argreg64[i]);
+    }
+    gen_expr(call->args[LAST_REG]);    
+    println("\tsyscall");
     return true;
   }
   return false;
 }
+static bool is_builin_procedure(Call* call){
+#define DOIF(_name, ...) \
+  if(STR_CMP(call->p_name, _name)) {{__VA_ARGS__} return true;}
+  DOIF("__print__", {
+      for(size_t i=0; i < call->args_size; ++i){;
+	gen_expr(call->args[i]);
+	println("\tmov rdi, rax");
+	println("\tcall __print");
+      }
+    });
+  DOIF("__asm__", {
+      for(size_t i=0; i < call->args_size; ++i){
+	assert(call->args[i]->kind = EXPRKIND_STRING_LITERAL);
+	const char* _asm_ = call->args[i]->as.STRING;
+	println("\t%s", _asm_);
+      }
+      
+    });
+  DOIF("__alloc__", {
+      static int alloc_count = 1;
+      assert(buf__len(call->args) == 1);
+      gen_expr(call->args[0]);
+      println("\tmov rdi, rax");
+      println("\tadd rdi, 15");
+      println("\tand edi, 0xfffffff0");
+      println("\tmov rcx, [rbp + %i]", current_proc->stack_allocation);
+      println("\tsub rcx, rsp");
+      println("\tmov rax, rsp");
+      println("\tsub rsp, rdi");
+      println("\tmov rdx, rsp");
+      println(".L.ALLOC.%i:", alloc_count);
+      println("\tcmp r8, 0");
+      println("\tje .L.ALLOC.END.%i", alloc_count);
+      println("\tmov r8, rax");
+      println("\tmov rdx, r8");
+      println("\tinc rdx");
+      println("\tinc rax");
+      println("\tdec rcx");
+      println("\tjmp .L.ALLOC.%i", alloc_count);
+      println(".L.ALLOC.END.%i:", alloc_count);
+      println("\tmov rax, [rbp + %i]", current_proc->stack_allocation);
+      println("\tsub rax, rdi");
+      println("\tmov [rbp + %i], rax", current_proc->stack_allocation);
+      alloc_count++;
+    });
+#define DOIF_SYSCALL(sys_len)\
+  if(test_make_syscall(call, "SYSCALL" #sys_len, sys_len + 1)) return true;
+  
+  DOIF_SYSCALL(0);
+  DOIF_SYSCALL(1);
+  DOIF_SYSCALL(2);
+  DOIF_SYSCALL(3);
+  DOIF_SYSCALL(4);
+  DOIF_SYSCALL(5);
+  DOIF_SYSCALL(6);
+   
+     
+#undef DOIF
+#undef DOIF_SYSCALL
+  return false;
+}
 static void cmp_zero(Type *ty) {
   switch (ty->kind) {
-  //case TYPE_F32:
-  //  println("  xorps %%xmm1, %%xmm1");
-  //  println("  ucomiss %%xmm1, %%xmm0");
-  //  return;
-  case TYPE_F64:
-    println("  xorpd %%xmm1, %%xmm1");
-    println("  ucomisd %%xmm1, %%xmm0");
+  case TYPE_I64:
+    println("\tcmp rax, 0");
     return;
   }
-  //if (is_integer(ty) && ty->size <= 4)
-  //  println("  cmp eax, 0");
-
-  println("\tcmp rax, 0");
+  unreachable();  
 }
-static void gen_expr(Expr* expr){
+static void gen_expr_cmp(Expr* expr){
+  static int cmp_count = 0;
+  if(expr->kind != EXPR_COMPARASION){
+    gen_expr(expr);
+    return;
+  }
+  Expr*         lhs = expr->as.comparasion.lhs;
+  Expr*         rhs = expr->as.comparasion.rhs;      
+  EXPR_CMP_KIND  op = expr->as.comparasion.op;
+  gen_expr(rhs);
+  push();
+  gen_expr(lhs);
+  pop("rbx");
+  // rax = lhs
+  // rbx = rhs
+
+  println("\tcmp rax, rbx");
+  switch(op){
+  case LT:
+    println("\tjge .L.CMP.UNMATCH.%i", cmp_count);
+    break;
+  case LTE:
+    println("\tjg .L.CMP.UNMATCH.%i", cmp_count);
+    break;    
+  case EQ:
+    println("\tjne .L.CMP.UNMATCH.%i", cmp_count);
+    break;    
+  case NEQ:
+    println("\tje .L.CMP.UNMATCH.%i", cmp_count);
+    break;        
+  case GTE:
+    println("\tjb .L.CMP.UNMATCH.%i", cmp_count); 
+    break;    
+  case GT:
+    println("\tjbe .L.CMP.UNMATCH.%i", cmp_count);
+                   
+    break;
+  default:
+    unreachable();
+  }
+  println("\tmov rax, 1");
+  println("\tjmp .L.CMP.END%i", cmp_count);
+  println(".L.CMP.UNMATCH.%i:", cmp_count);
+  println("\tmov rax, 0");
+  println(".L.CMP.END%i:", cmp_count);
+  cmp_count++;
+}
+
+static Type* gen_expr(Expr* expr){
   switch(expr->kind){
   case EXPRKIND_INT:
     println("\tmov rax, %zu", (size_t)expr->as.INT);
-    break;
-  case EXPRKIND_NAME: {
-    
+    return Type_int();
+  case EXPRKIND_STRING_LITERAL: {
+    static int str_count = 0;
+    buf__push(strings, expr->as.STRING);
+    println("\tmov rax, DATA%i", str_count);
+    str_count++;
+  } return Type_ptr(Type_char());
+  case EXPRKIND_NAME: {    
     if(Var* lv = Var_get(&local_vars, expr->name)){
       gen_addr(lv);
-      load(lv->type_field->type);
-      return;
+      if(load_vars) {
+	load(lv->type_field->type);
+	return lv->type_field->type;
+      }
+      return Type_ptr(lv->type_field->type);
+    }
+    else if(Var* gv = Var_get(&global_vars, expr->name)){
+      println("\tmov rax, __var_%s__", gv->type_field->name);
+      if(load_vars) {
+	load(gv->type_field->type);
+	return gv->type_field->type;
+      }
+      return Type_ptr(gv->type_field->type);
     }
     else if (Macro* macro = GFL_Macros_find(expr->name)){
-      gen_expr(macro->expr);
-      return;
+      return gen_expr(macro->expr);
     }
     else {
+      print_expr(expr);
       fprintf(stderr,
 	      "ERROR: %s is not declared in this scope.\n",
 	      expr->name);
       exit(1);
     }
   } break;
-  case EXPRKIND_PROC_CALL: {
-    if(is_builin_procedure(&expr->as.call)) return;
-    printf("ERROR: '%s' procedures are not implemented yet.\n",
-	   expr->as.call.p_name);
-    exit(1);
-  } break;
-  case EXPRKIND_REASIGN: {
-    Var* from = Var_from_expr(expr->as.Reasign.from);
     
-    gen_addr(from);
+  case EXPRKIND_PROC_CALL: {
+    if(is_builin_procedure(&expr->as.call)) return Type_none();    
+    Call* call = &expr->as.call;    
+    Proc* proc = Proc_get(&procs, call->p_name);    
+    if(!proc){
+      fprintf(stderr,
+	      "ERROR: the procedure '%s' was not declared in this scope.\n",
+	      call->p_name);
+      exit(1);
+    }
+    if(proc->args){
+      size_t call_argsSize = call->args_size;
+      size_t proc_argsSize = proc->args->vars_size;
+      if(call_argsSize != proc_argsSize){
+	assert(call_argsSize < proc_argsSize);
+	for(size_t i=call_argsSize; i < buf__len(proc->args->vars); ++i){
+	  Var* param = proc->args->vars[i];
+	  if(param->expr){
+	    buf__push(call->args, param->expr);
+	  }
+	  else {
+	    fprintf(stderr,
+		    "ERROR: expected %zu arguments but got %zu when calling procedure '%s'\n",
+		    proc_argsSize,
+		    call_argsSize,
+		    proc->name);
+	    exit(1);
+	  }
+	}	
+      }
+    }
+    int stack_args = push_callargs(call->args);
+    int gp = 0, fp = 0;    
+    println("\tcall %s", call->p_name);
+    if(stack_args > 0) {
+      println("\tadd rsp, %i", stack_args * 8);
+      rbp_stack_offset = 0;
+    }
+    // TODO: search on why add rsp after call
+    //int dealloc_size = (stack_args - 2) * 8;
+    //if(dealloc_size > 0) println("\tadd rsp, %i", dealloc_size);
+    
+    depth -= stack_args;
+  } break;
+  case EXPRKIND_NAMESPACE_GET: {
+    ns_ctx  = true;
+    ns_name = (char*)expr->as.NamespaceGet.name;
+    gen_expr(expr->as.NamespaceGet.rhs);
+    ns_ctx  = false;
+    ns_name = NULL;
+  } break;
+  case EXPRKIND_DERREF_NAME: {
+    Type* type = gen_expr(expr->as.derref);
+    if(type->kind != TYPE_PTR){
+      fprintf(stderr,
+	      "ERROR: trying to derreference a non-pointer value.\n");
+      exit(1);
+    }    
+    return load(type->ptr.base);    
+  } break;
+  case EXPRKIND_ADDROF_NAME: {
+    // TODO: check if is a lvalue // non memory addr
+    load_vars = false;
+    Type* type = gen_expr(expr->as.addr_of);
+    load_vars = true;
+    return type;
+  } break;
+  case EXPRKIND_REASIGN: {    
+    load_vars = false;
+    Type* tfrom = gen_expr(expr->as.Reasign.from);
+    load_vars = true;
     push();
     gen_expr(expr->as.Reasign.to);
-    store(from->type_field->type);    
+    store(tfrom);    
   } break;
   case EXPR_BINARY_OP: {
 #define bin(op, reg_a, reg_b) println("\t%s %s, %s", op, reg_a, reg_b)
     const char* op;
+    // NOTE: e_d stands for expression depth
+    static size_t e_d = 0;
+    e_d += 2;
+    gen_expr(expr->as.BinaryOp.rhs);
+    push();
+    gen_expr(expr->as.BinaryOp.lhs);
+    e_d -= 2;
     switch(expr->as.BinaryOp.op){
     case OP_KIND_PLUS:
       op = "add";
@@ -174,60 +506,98 @@ static void gen_expr(Expr* expr){
     case OP_KIND_MINUS:
       op = "sub";
       break;
+    case OP_KIND_DIV:
+
+      if(e_d == 0){
+	pop("rbx");
+      }
+      else {
+	pop("rax");
+	pop("rbx");	
+      }
+      println("\tdiv rbx");	
+      return Type_int();
+    case OP_KIND_MULT:
+      if(e_d == 0){
+	pop("rbx");
+	println("\tmul rbx");
+      }
+      else {
+	pop("rax");
+	pop("rbx");
+	println("\tmul rbx");
+      }
+      return Type_int();
     default:
       unreachable();
-    }
-    static size_t e_d = 0;
-    e_d += 2;
-    gen_expr(expr->as.BinaryOp.lhs);
-    push();
-    gen_expr(expr->as.BinaryOp.rhs);
-    e_d -= 2;
+    }        
     // TODO: optimize this section
     if(e_d == 0){
       pop("rbx");
-      bin(op, "rax", "rbx");      
     }
     else {
       push();
-      pop("rax");
       pop("rbx");
-      bin(op, "rax", "rbx");
-    }   
+      pop("rax");
+    }
+    bin(op, "rax", "rbx");
 #undef bin
   } break;
-    
+  case EXPRKIND_CAST:
+    gen_expr(expr->as.Cast.expr);
+    return expr->as.Cast.type->type;
+  case EXPR_COMPARASION: 
+    gen_expr_cmp(expr);
+    break;
+  case EXPRKIND_LOCAL_IF: {
+    static size_t local_if_count = 0;
+    gen_expr(expr->as.local_if.cond);
+    cmp_zero(Type_int());
+    println("\tje  .L.LOCAL_IF_ELSE.%zu", local_if_count);
+    gen_expr(expr->as.local_if.if_body);
+    println("\tjmp .L.LOCAL_IF_END.%zu", local_if_count);
+    println(".L.LOCAL_IF_ELSE.%zu:", local_if_count);
+    gen_expr(expr->as.local_if.else_body);
+    println(".L.LOCAL_IF_END.%zu:", local_if_count);
+    local_if_count++;
+  } break;
+  case EXPRKIND_NEG:
+    // TODO: expr with Type
+    gen_expr(expr->as.expr);
+    println("\tneg rax");
+    break;
   default:
     print_expr(expr);
-    printf("\n");
     unreachable();
   }
 }
-size_t calc_offset(size_t offset){
-  static size_t _offset = 0;
-  _offset += offset;
-  return _offset;
-}
+
 static void gen_stmt(Stmt* stmt){
+  static int while_lb;
   switch(stmt->kind){
   case STMTKIND_EXPR:
     gen_expr(stmt->as.expr);
     break;
+  case STMTKIND_BLOCK: {
+    Block* block = stmt->as.stmts;
+    for(size_t i=0; i < buf__len(block->stmts); ++i){
+      gen_stmt(block->stmts[i]);
+    }
+  } break;
   case STMTKIND_IF: {
     int if_lb = count();
     int end_lb = if_lb;
     gen_expr(stmt->as.__if.expr);
-    // TODO: embbed type in expr
     cmp_zero(Type_int());
+    println("\tje .L.else.%i", if_lb);
 
-    println("\tje .L.else.%i", if_lb);    
     for(size_t i=0; i < buf__len(stmt->as.__if.block->stmts); ++i){
       gen_stmt(stmt->as.__if.block->stmts[i]);
     }
     println("\tjmp .L.else.end.%i", end_lb);    
     println(".L.else.%i:", if_lb);
-    Elif* elif = stmt->as.__if.elif_nodes;
-    if(elif){
+    
+    if(Elif* elif = stmt->as.__if.elif_nodes){
       for(size_t i=0; i < elif->nodes_size; ++i){
 	if_lb = count();
 	gen_expr(elif->node_expr[i]);
@@ -248,6 +618,11 @@ static void gen_stmt(Stmt* stmt){
     println(".L.else.end.%i:", end_lb);
   } break;
   case STMTKIND_RETURN:
+    if(current_decl->as.procDecl.ret_type->kind == TYPE_NONE){
+      fprintf(stderr,
+	      "ERROR: return only works in non-void procedures.\n");
+      exit(1);
+    }
     if(stmt->as.expr){
       gen_expr(stmt->as.expr);      
     }
@@ -255,7 +630,6 @@ static void gen_stmt(Stmt* stmt){
     println("\tjmp .L.return.%s", current_decl->as.procDecl.name);
     break;
   case STMTKIND_LOCAL_VAR:
-    stmt->as.var->offset = calc_offset(stmt->as.var->offset);
     Var_push(&local_vars, stmt->as.var);
     if(stmt->as.var->expr){
       Var* lv = stmt->as.var;
@@ -265,110 +639,239 @@ static void gen_stmt(Stmt* stmt){
       store(lv->type_field->type);
     }
     break;
+  case STMTKIND_WHILE:{
+    while_lb = count();
+    int saved_lb = while_lb;
+    println(".L.LOOP_BEGIN.%i:", saved_lb);
+    gen_expr(stmt->as.__while.expr);
+    cmp_zero(Type_int());
+    println("\tje .L.LOOP_BREAK.%i", saved_lb);
+    
+    for(size_t i=0; i < buf__len(stmt->as.__while.block->stmts); ++i){
+      gen_stmt(stmt->as.__while.block->stmts[i]);
+      while_lb = saved_lb;
+    }
+    println("\tjmp .L.LOOP_BEGIN.%i", saved_lb);
+    println(".L.LOOP_BREAK.%i:", saved_lb);
+  } break;
   case STMTKIND_BREAK:
+    println("\tjmp .L.LOOP_BREAK.%i", while_lb);
+    break;
   case STMTKIND_CONTINUE:
-  case STMTKIND_STMT:
-  case STMTKIND_WHILE:    
+    println("\tjmp .L.LOOP_BEGIN.%i", while_lb);
+    break;
+  case STMTKIND_STMT:  
   case STMTKIND_FOR:   
   case STMTKIND_DO_WHILE: 
   case STMTKIND_SWITCH:
   default:
+    print_stmt(stmt);
     unreachable();
   }
 }
+static void store_gp(int r, int offset, int sz){
+  switch(sz){
+  case 1:
+    println("\tmov [rbp + %i], %s", offset, argreg8[r]);
+    break;
+  case 2:
+    println("\tmov [rbp + %i], %s", offset, argreg16[r]);
+    break;
+  case 4:
+    println("\tmov [rbp + %i], %s", offset, argreg32[r]);
+    break;
+  case 8:
+    println("\tmov [rbp + %i], %s", offset, argreg64[r]);
+    break;    
+  default:
+    for(int i = 0; i < sz; ++i){
+      println("\tmov [rbp + %i], %s", offset + i, argreg8[r]);
+      println("\tshr %s, 8", argreg64[r]);
+    }
+  }
+}
+static void gen_proc_params(Decl* procDecl){
+  int gp = 0, fp = 0;
+  ProcArgs* pa  = procDecl->as.procDecl.args;  
+  
+  if(pa){
+    if(pa->vars_size > MAX_ARGREG64){
+      fatal("Compiler can not handle more than %zu arguments, got %zu\n",
+	    MAX_ARGREG64,
+	    pa->vars_size);
+      exit(1);
+    }
+    store_callargs(pa);
+    DEBUG_OK;
+  }
+}
 static void gen_proc_prologue(Decl* procDecl){
+  println("\tglobal %s", procDecl->as.procDecl.name);
   println("\tsection .text");
   println("%s:", procDecl->as.procDecl.name);
-  println("\tpush rbp");
-  println("\tmov rbp, rsp");
-  println("\tsub rsp, %zu", procDecl->as.procDecl.stack_allocation);
-  if(procDecl->as.procDecl.args->argsList_size > 0){
-    fprintf(stderr,
-	    "ERROR: procedure params are not implemented yet.\n");
-    exit(1);
-  }
-  
+  println("\tpush rbp");      
+  println("\tmov  rbp, rsp");
+  int alloc = align_to((int)procDecl->as.procDecl.stack_allocation, 8);
+  if(alloc > 0) println("\tsub rsp, %i", alloc);
+  gen_proc_params(procDecl); 
 }
 void AssemblerPROC(Decl* decl){
+  // prologue
   gen_proc_prologue(decl);
-  for(size_t idx=0; idx < decl->as.procDecl.block->stmts_size; ++idx){   
-    Stmt* stmt = decl->as.procDecl.block->stmts[idx];
-    gen_stmt(stmt);
-    printf("ok\n");
+  // block
+  for(size_t idx=0; idx < decl->as.procDecl.block->stmts_size; ++idx){	
+    Stmt* stmt = decl->as.procDecl.block->stmts[idx];			
+    gen_stmt(stmt);							
   }
-  if(STR_CMP(decl->as.procDecl.name, "main")){
-    printf("MAIN\n\n");
-    println("\tmov rax, 0");
+  // return
+  println(".L.END_OF_PROC.__%s__:", decl->as.procDecl.name);
+  if(STR_CMP(decl->as.procDecl.name, "main")){   
+    println("\tmov eax, 0");
   }
   println(".L.return.%s:", decl->as.procDecl.name);
-  println("\tmov rsp, rbp");
-  println("\tpop rbp");
+
+  println("\tleave");
   println("\tret");
   
 }
-void AssemblerAST(Decl** ast, const char* output_fp){
+void AssemblyNode(Decl* decl){
+
+  switch(decl->kind){
+  case DECL_PROC:
+    current_proc = &decl->as.procDecl;
+    init_args(decl->as.procDecl.args);
+    Proc_push(&procs, decl);
+    current_decl = decl;
+    AssemblerPROC(decl);
+    buf__free(local_vars);
+    break;
+  case DECL_VAR: {
+    Var* global_var = &decl->as.varDecl;
+    Var_push(&global_vars, global_var);
+  } break;
+  case DECL_NAMESPACE:
+    ns_ctx  = true;
+    ns_name = (char*)decl->as.Namespace.name;
+    for(size_t i=0; i< buf__len(decl->as.Namespace.decls); ++i){
+      Decl* ns = decl->as.Namespace.decls[i];
+      if(!ns->used) continue;
+      strcat((char*)ns->name, "_");
+      strcat((char*)ns->name, ns_name);
+      AssemblyNode(ns);
+    }
+    break;
+  default:
+    unreachable();
+  }
+  DEBUG_OK;
+  
+}
+void AssemblerAST(const char* output_fp){
   output_file = fopen(output_fp, "w");
   assert(output_file);
   println("\tglobal _start");
   println("__print:");
-  println("\tpush  rbp");
-  println("\tmov   rbp, rsp");
-  println("\tsub   rsp, 64");
-  println("\tmov   QWORD  [rbp-56], rdi");
-  println("\tmov   QWORD  [rbp-8], 1");
-  println("\tmov   eax, 32");
-  println("\tsub   rax, QWORD  [rbp-8]");
-  println("\tmov   BYTE  [rbp-48+rax], 10");
-  println(".__print_loop:");
-  println("\tmov   rcx, QWORD  [rbp-56]");
-  println("\tmov   rdx, -3689348814741910323");
-  println("\tmov   rax, rcx");
-  println("\tmul   rdx");
-  println("\tshr   rdx, 3");
-  println("\tmov   rax, rdx");
-  println("\tsal   rax, 2");
-  println("\tadd   rax, rdx");
-  println("\tadd   rax, rax");
-  println("\tsub   rcx, rax");
-  println("\tmov   rdx, rcx");
-  println("\tmov   eax, edx");
-  println("\tlea   edx, [rax+48]");
-  println("\tmov   eax, 31");
-  println("\tsub   rax, QWORD  [rbp-8]");
-  println("\tmov   BYTE  [rbp-48+rax], dl");
-  println("\tadd   QWORD  [rbp-8], 1");
-  println("\tmov   rax, QWORD  [rbp-56]");
-  println("\tmov   rdx, -3689348814741910323");
-  println("\tmul   rdx");
-  println("\tmov   rax, rdx");
-  println("\tshr   rax, 3");
-  println("\tmov   QWORD  [rbp-56], rax");
-  println("\tcmp   QWORD  [rbp-56], 0");
-  println("\tjne   .__print_loop");
-  println("\tmov   eax, 32");
-  println("\tsub   rax, QWORD  [rbp-8]");
-  println("\tlea   rdx, [rbp-48]");
-  println("\tlea   rcx, [rdx+rax]");
-  println("\tmov   rax, QWORD  [rbp-8]");
-  println("\tmov   rdx, rax");
-  println("\tmov   rsi, rcx");
-  println("\tmov   edi, 1");
-  println("\tmov   rax, 1");
+  println("\tpush rbp");
+  println("\tmov rbp, rsp");
+  println("\tsub rsp, 64");
+  println("\tmov DWORD [rbp-52], edi");
+  println("\tmov DWORD [rbp-4], 1");
+  println("\tmov eax, DWORD [rbp-4]");
+  println("\tmov edx, 32");
+  println("\tsub rdx, rax");
+  println("\tmov BYTE [rbp-48+rdx], 10");
+  println(".L2:");
+  println("\tmov ecx, DWORD [rbp-52]");
+  println("\tmov edx, ecx");
+  println("\tmov eax, 3435973837");
+  println("\timul rax, rdx");
+  println("\tshr rax, 32");
+  println("\tmov edx, eax");
+  println("\tshr edx, 3");
+  println("\tmov eax, edx");
+  println("\tsal eax, 2");
+  println("\tadd eax, edx");
+  println("\tadd eax, eax");
+  println("\tsub ecx, eax");
+  println("\tmov edx, ecx");
+  println("\tmov eax, edx");
+  println("\tlea ecx, [rax+48]");
+  println("\tmov eax, DWORD [rbp-4]");
+  println("\tmov edx, 31");
+  println("\tsub rdx, rax");
+  println("\tmov eax, ecx");
+  println("\tmov BYTE [rbp-48+rdx], al");
+  println("\tadd DWORD [rbp-4], 1");
+  println("\tmov eax, DWORD [rbp-52]");
+  println("\tmov edx, eax");
+  println("\tmov eax, 3435973837");
+  println("\timul rax, rdx");
+  println("\tshr rax, 32");
+  println("\tshr eax, 3");
+  println("\tmov DWORD [rbp-52], eax");
+  println("\tcmp DWORD [rbp-52], 0");
+  println("\tjne .L2");
+  println("\tmov eax, DWORD [rbp-4]");
+  println("\tmov edx, 32");
+  println("\tsub rdx, rax");
+  println("\tlea rax, [rbp-48]");
+  println("\tlea rcx, [rax+rdx]");
+  println("\tmov eax, DWORD [rbp-4]");
+  println("\tmov edx, eax");
+  println("\tmov rsi, rcx");
+  println("\tmov edi, 1");
+  println("\tmov rax, 1");
   println("\tsyscall");
   println("\tnop");
   println("\tleave");
   println("\tret");
-  println("global _start");
-  println("segment .text");	
-  assert(buf__len(ast) == 1);
-  assert(ast[0]->kind == DECL_PROC);
-  current_decl = ast[0];
-  AssemblerPROC(ast[0]);
+  for(size_t i=0; i < buf__len(namespaces); ++i){
+    AssemblyNode(namespaces[i]);
+  }
+
+  for(size_t i=0; i < buf__len(modules); ++i){
+    println("\t;; file [%s]", modules[i]->path);
+    Decl** mod_ast = modules[i]->ast;
+    for(size_t j=0; j < buf__len(mod_ast); ++j){
+      AssemblyNode(modules[i]->ast[j]);
+    }
+  }
+
+
   println("_start:");
+  for(size_t i=0; i < buf__len(global_vars); ++i){
+    Var* global_var = global_vars[i];
+    if(global_var->expr){
+      gen_expr(global_var->expr);
+      println("\tmov rdi, __var_%s__", global_var->type_field->name);
+      println("\tmov [rdi], rax");
+    }
+  }
   println("\tcall main");
   println("\tmov rdi, rax");
   println("\tmov rax, 60");
   println("\tsyscall");
+  if(buf__len(global_vars) > 0){
+    println("\tsegment .bss");
+    for(size_t i=0; i < buf__len(global_vars); ++i){
+      Var* global_var = global_vars[i];
+      println("__var_%s__: resb %zu",
+	      global_var->type_field->name,
+	      global_var->type_field->type->size);
+    }
+  }
+  if(buf__len(strings) > 0){
+    println("\tsegment .data");
+    for(size_t i=0; i < buf__len(strings); ++i){
+      const char* str = strings[i];
+      fprintf(output_file, "\tDATA%zu: db ", i);
+      for(size_t i=0; i < buf__len(str); ++i){
+	fprintf(output_file, "%i, ", (int)str[i]);
+      }
+      println("");
+    }
+  }
+  fclose(output_file);  
 }
 
 #endif /* __assembler */

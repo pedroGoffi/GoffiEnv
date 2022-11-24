@@ -15,8 +15,22 @@ void lexer_scan_float();
 void lexer_scan_int();
 void lexer_scan_string();
 void next_token();
+#define MAX_STREAMS_SIZE 1024
+const char*  stream;
+struct Streams{
+  const char*  streams[MAX_STREAMS_SIZE];
+  size_t       streams_size = 0;
+};
 
-const char* stream;
+Streams streams = {};
+
+void Streams_push(const char* str){
+  assert(streams.streams_size < MAX_STREAMS_SIZE);
+  strcpy((char*)streams.streams[streams.streams_size++], str);
+}
+const char* Streams_pop(){
+  return streams.streams[streams.streams_size--];
+}
 const char* var_keyword = str_intern("var");
 const char* file;
 size_t line_pos;
@@ -25,7 +39,6 @@ void init_stream(const char *str){
   stream = str;
   next_token();
 }
-
 
 int char_to_int(char c){
   switch(c){
@@ -56,7 +69,8 @@ char escape_to_char(char c){
   case 'v': return '\v';
   case 'b': return '\b';
   case 'a': return '\a';
-  default:  return 0;
+  case '\\': return '\\';
+  default:  return 0;    
   }
 }
 
@@ -73,7 +87,7 @@ void lexer_scan_char(){
   } else if (*stream == '\\'){
     stream++;
     c = escape_to_char(*stream);
-    if(c == 0 && *stream != 0){
+    if(c == 0 && *stream != '0'){
       syntax_error("invalid char literal escape `%c` found.\n", *stream);
       exit(1);
     }
@@ -99,7 +113,7 @@ void lexer_scan_string(){
   while(*stream && *stream != '"'){
     char c = *stream;
     
-    if(c == '\n'){
+    if(*stream == '\n'){
       syntax_error("string literal can not contain newlines.\n");
       exit(1);
     } else if (c == '\\') {
@@ -108,7 +122,7 @@ void lexer_scan_string(){
       if(c == 0 && *stream != '0'){
 	syntax_error("invalid scape character in string literal '\\%c'.\n", *stream);
 	exit(1);
-      }
+      }      
     }
     buf__push(buf, (int)c);
     stream++;    
@@ -228,8 +242,6 @@ void next_token(){
     break;
   case '"':
     lexer_scan_string();
-    //token.name          = str_intern_range(stream_begin, stream);
-    printf("found a string :: %s\n", token.name);
     break;
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9': {

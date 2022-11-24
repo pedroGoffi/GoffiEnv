@@ -1,3 +1,4 @@
+
 NULL			        :: 0 
 stdin				:: 0 
 stdout				:: 1 
@@ -18,7 +19,7 @@ MAP_SHARED			:: 1
 MAP_PRIVATE			:: 2 
 PROT_READ			:: 1 
 PROT_WRITE			:: 2 
-PROT_EXEC			:: 4 
+PROT_EXEC			:: 4
 SYS_read			:: 0 
 SYS_write			:: 1 
 SYS_open			:: 2 
@@ -332,25 +333,12 @@ SYS_getcpu			:: 309
 SYS_process_vm_readv		:: 310 
 SYS_process_vm_writev		:: 311 
 SYS_kcmp			:: 312 
-SYS_finit_module		:: 313 
+SYS_finit_module		:: 313
 
-proc fopen(file_path: *char, flag: i64): i64 {
-  return SYSCALL(3,
-                 flag,
-                 file_path,
-                 AT_FDCWD,
-                 SYS_openat);
-}
+EXIT_OK				:: 0
+EXIT_FAILURE			:: 1
+_ExitOK				:: SYSCALL1(EXIT_OK,      SYS_exit)
+_ExitFailure			:: SYSCALL1(EXIT_FAILURE, SYS_exit)
 
-proc __write(len: i64, ptr: *char, fd: i64){
-
-  SYSCALL(3,
-          len,
-          *ptr,
-          fd,
-          SYS_write);
-}
-
-proc __exit(exit_code: i64){
-  SYSCALL(1, exit_code, SYS_exit); 
-}
+proc sex(): i64 = 1;
+//proc exit(exit_code: i64): void = SYSCALL1(exit_code, SYS_exit);

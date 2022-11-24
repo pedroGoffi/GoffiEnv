@@ -1,0 +1,35 @@
+proc write(fd: i64, ptr: i64, ptr_len: i64):void = SYSCALL3(fd, ptr, ptr_len, SYS_write);   
+
+proc putsf(ptr: *char, ptr_len: i64):void = write(stdout, ptr, ptr_len);
+
+proc strlen(str: *char): i64{
+  var len: i64 = 0;
+  var iter: *char = str;
+  while 0 < *iter{
+    len  = len  + 1;
+    iter = iter + 1;
+  }
+  return len;
+  
+}
+proc streq(a: *char, b: *char): i64{
+  // we'll loop so to avoid destruct the original variable
+  var str1: *char = a;
+  var str2: *char = b;
+  var s1: i64 = strlen(str1);
+  var s2: i64 = strlen(str2);
+  
+  if((s1 < s2) + (s2 < s1)) {return false;}
+  while 0 < *str1 {
+    if (*str1 < *str2) + (*str2 < *str1) { 
+      return false;
+    }
+    str1 = str1 + 1;
+    str2 = str2 + 1;    
+  }
+  return true;
+}
+proc puts(ptr: *char): void {
+  var size: i64 = strlen(ptr);
+  putsf(ptr, size);
+}

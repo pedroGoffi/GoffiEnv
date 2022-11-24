@@ -1,4 +1,0 @@
-simplified ast
-simplified instructions
-cross reference
-assembly

@@ -1,0 +1,15 @@
+expected_output :: 420
+proc f(x:i64 = expected_output): i64 {
+  return x;
+}
+proc main(): void{
+  __print__(
+    f(69), // 69
+    f()    // 420
+  );
+    
+  // expected output
+  // 69
+  // 420
+
+}

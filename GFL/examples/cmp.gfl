@@ -1,0 +1,13 @@
+proc main(): void {
+  var ans: i64 = 1;
+  if (ans - 1){  
+    __print__(420);
+  }
+  elif ans  {
+    __print__(69420);
+  }
+  else {
+    __print__(69);
+  }
+  // expected output = 69420
+}

@@ -1,0 +1,5 @@
+#import "std/core.gfl"
+proc main(): i64 {
+
+  exit(2);
+}

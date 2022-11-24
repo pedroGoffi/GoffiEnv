@@ -1,0 +1,3 @@
+proc main(): void {
+  __print__(420);
+}
