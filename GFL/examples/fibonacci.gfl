@@ -1,17 +1,14 @@
-///#import "std/core.gfl" 
-
-FIB_LIM :: 10000
-//or var FIB_LIM: i64 = 10000;
-
+#import "std/std.gfl"
 
 proc main(): void {
-  var x0: i64 = 0;
-  var x1: i64 = 1;
-  var x2: i64 = 0;
-  while x0 < FIB_LIM {
-    x0 = x1 + x2;
-    x1 = x2;
-    x2 = x0;
+  var lim: i64 = stoi(input("Input the max fib num: "));
+  var x0:  i64  = 0;
+  var x1:  i64  = 1;
+  var acc: i64  = 0;
+  while x0 < lim {
+    x0  = x1 + acc;
+    x1  = acc;
+    acc = x0;
     __print__(x0);
-  }
+  }  
 }

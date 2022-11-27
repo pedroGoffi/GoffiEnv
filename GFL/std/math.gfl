@@ -1,17 +1,25 @@
-proc square(x: i64): i64 =  x * x;
+proc square(x: i64): i64    =  x * x;
+proc inc64(ptr: *i64): void { *ptr = *ptr + 1;}
 
+proc fact2(x: i64): i64 {
+  if x < 2 {
+    return 1;
+  }
+  // Allocate some space in recursion call
+  var r: i64 = fact2(x - 1);
+  return x*r;
+}
 proc fact(x: i64): i64 {
   var res: i64  = 1;
   var iter: i64 = x;
   while 0 < iter {
-    res = res * iter;
+    res  = res * iter;
     iter = iter - 1;
   }
   return res;
 }
 
-proc sum_range(begin: i64, end: i64): i64{
+proc sum_range(end:i64, begin:i64=0): i64{
      // formula: (b²+b - a²-a)/2 b = end, a = begin
      return (square(end) + end - square(begin) - begin) / 2;
 }
-

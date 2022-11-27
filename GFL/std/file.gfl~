@@ -1,7 +1,0 @@
-proc fopen(file_path: *char, flag: i64): i64{
-  return SYSCALL3(
-		*flag,
-		*file_path,
-		AT_FDCWD,
-		SYS_openat);
-}

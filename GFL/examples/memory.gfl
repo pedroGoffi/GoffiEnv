@@ -1,5 +1,0 @@
-
-proc main(): void {
-  var ptr: __type_size__[16] = 420;.
-
-}

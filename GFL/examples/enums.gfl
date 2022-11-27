@@ -1,0 +1,8 @@
+enum Enum{
+  A,
+  B,
+  C
+}
+proc main(): void {
+  __print__(A, B, C);
+}

@@ -6,7 +6,7 @@
 #include <map>
 #include "./token.cpp"
 #include "../../common/utils.cpp"
-
+#define MAX_STREAMS_SIZE 1024
 typedef struct Stmt Stmt;
 typedef struct Module Module;
 typedef struct StmtList StmtList;
@@ -101,6 +101,8 @@ const char* human_expr_cmp_kind(EXPR_CMP_KIND kind){
 }
 typedef enum TypeKind{
   TYPE_NONE,
+  // TODO: TYPE_I8,
+  // TODO: TYPE_I16,  
   TYPE_I32,
   TYPE_I64,
   TYPE_BOOL,
@@ -117,6 +119,7 @@ typedef enum TypeKind{
 struct Type{
   TypeKind kind;
   size_t   size;
+  bool     is_unsigned;
   const char* name;
   union{
     struct{
@@ -285,6 +288,12 @@ inline bool GFL_MACROS_exists(const char* name){
   return (GFL_Macros_pos(name) != -1);
 }
 void GFL_Macros_push(Macro macro){
+  if(GFL_Macros_find(macro.name)){
+    fprintf(stderr,
+	    "ERROR: redeclaration of a macro %s.\n",
+	    macro.name);
+    exit(1);
+  }
   buf__push(GFL_macros, macro);
 }
 TypeFieldKind TypeFieldKind_by_cstr(const char* type){
@@ -299,8 +308,7 @@ TypeFieldKind TypeFieldKind_by_cstr(const char* type){
   DOIF_TYPE("f64",  TYPE_F64);
   DOIF_TYPE("char", TYPE_CHAR);
   DOIF_TYPE("bool", TYPE_BOOL);
-  DOIF_TYPE("void", TYPE_NONE);
-  
+  DOIF_TYPE("void", TYPE_NONE);  
 #undef DOIF_TYPE
   return TYPE_UNSOLVED;
 }
@@ -357,10 +365,11 @@ Type* Type_ptr_copy(Type* ptr){
 
 int sizeof_type(Type* type){
   switch(type->kind){
-  case TypeKind::TYPE_I32:  return 4;
-  case TypeKind::TYPE_I64:  return 8;
-  case TypeKind::TYPE_BOOL: return 1;
-  case TypeKind::TYPE_CHAR: return 4;
+  
+  case TypeKind::TYPE_BOOL: 
+    return 1;
+  case TypeKind::TYPE_CHAR:
+  case TypeKind::TYPE_I64:  
   case TypeKind::TYPE_PTR:  return 8;
     
   case TypeKind::TYPE_ARRAY:
@@ -510,7 +519,7 @@ enum DeclKind{
   DECL_VAR,
   DECL_TYPEDEF,
   DECL_PROC,
-  DECL_CIMPORT,
+  DECL_IMPORT, 
   DECL_NAMESPACE,
 };
 struct Proc{
@@ -520,7 +529,14 @@ struct Proc{
   Type      *ret_type;
   StmtList  *block;
 };
-
+struct EnumField{
+  const char* name;
+  Expr*       expr;
+  size_t      offset;
+};
+struct EnumFields{
+  EnumField**  fields;
+};
 struct Decl{
   DeclKind    kind;
   const char* name;
@@ -533,27 +549,27 @@ struct Decl{
       size_t     fields_size;
     } structDecl;
     struct{
+      EnumFields* fields;
+    } Enum;
+    struct{
       const char* FILENAME;
       bool isStd;
     } cimportDecl;
     struct{
-      Type* type;
-      Type* type_equivalent;
+      const char* name;
+      Type*       type;
     } Typedef;
     struct{
       const char* name;
       Decl**      decls;
     } Namespace;
+    struct{
+      const char* path;
+      Decl**      ast;
+    } Import;
   } as;
 };
-struct Module {
-  const char* path;
-  Decl**      ast;
-};
-Module** modules = NULL;
-void Module_push(Module*** mods, Module* mod){
-  buf__push(*mods, mod);
-}
+
 Decl**   namespaces = NULL;
 Decl* namespaces_get(const char* root, const char* child=""){
   for(size_t i=0; i < buf__len(namespaces); ++i){
@@ -914,13 +930,7 @@ void print_stmt_list(Block*  b){
 }
 void print_decl(Decl* d){
   switch(d->kind){
-  case DeclKind::DECL_TYPEDEF:
-    printf("typedef (");
-    print_type(d->as.Typedef.type);
-    printf(") = (");
-    print_type(d->as.Typedef.type_equivalent);
-    printf(")\n");    
-    break;
+
   case DeclKind::DECL_VAR:
     printf("(var %s[",
 	   d->name);
@@ -928,7 +938,7 @@ void print_decl(Decl* d){
     printf("] = ( ");
     print_expr(d->as.varDecl.expr);
     printf(" ))\n");
-    break;
+    break;  
   case DeclKind::DECL_PROC:
     ident();
     printf("( proc [%s->",
@@ -969,9 +979,10 @@ void print_decl(Decl* d){
     ident();
     printf(")");
     break;
+  case DeclKind::DECL_TYPEDEF:
+  case DeclKind::DECL_IMPORT: 
   case DeclKind::DECL_NAMESPACE:
     return;
-  case DeclKind::DECL_CIMPORT:
   case DeclKind::DECL_ENUM:
   case DeclKind::DECL_UNION:
   default:

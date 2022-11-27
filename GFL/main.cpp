@@ -65,10 +65,9 @@ int main(int argc, char** argv){
   }  
   
   
-  
-  parse_file(input_fp);
-  //print_ast(modules[0]->ast);
-  AssemblerAST(output_fp);
+  // TODO: order_ast without bug
+  Decl** ast = order_ast(parse_from_file(input_fp));
+  AssemblerAST(ast, output_fp);
   CompileAsmToBinary(output_fp);
   return 0;   
 }

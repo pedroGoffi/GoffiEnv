@@ -1,1 +1,37 @@
-a :: 1;
+O_READONLY			:: 0 
+O_WRONLY			:: 1 
+O_CREAT				:: 64 
+O_APPEND			:: 1024 
+O_TRUNC				:: 512 
+O_ALL				:: O_READONLY
+                                 + O_WRONLY
+                                 + O_CREAT	
+                                 + O_APPEND
+                                 + O_TRUNC
+
+AT_FDCWD                        :: -100 				 
+proc fopen(path: *char, flag: i64): i64{
+  return SYSCALL3(AT_FDCWD, path, flag, SYS_openat);	   
+  
+}
+proc open(path: *char, flags: *char): i64 {
+  var flag: i64 = 0;
+  while 0 < *flags{
+    if *flags == 'w' {
+      flag = flag + O_WRONLY;
+    }
+    if *flags == 'r' {
+    flag = flag + O_READONLY;
+    }
+    elif *flags == 'a'{
+      flag = O_ALL;
+      break;
+    }
+    else {
+      puts("ERROR: undefined flag in open procedure.\n");
+      exit(1);
+    }
+    flags = flags + 1;
+  }
+  return fopen(path, flag);
+}

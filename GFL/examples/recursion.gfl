@@ -1,0 +1,13 @@
+proc factorial(x: i64):*i64 {
+  // allocate some stuff to return  
+  var v:i64 =  1 if x < 2 else factorial(x-1);
+  return x*v;
+}  
+proc main(): void {
+  __print__(
+    factorial(5) // 5! = 120
+  );
+  // Return in main procedure is absolutely useless
+  return 0;
+}
+

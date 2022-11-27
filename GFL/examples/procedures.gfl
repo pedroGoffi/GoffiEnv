@@ -1,29 +1,22 @@
-proc square(x: i64): i64 =  x * x;
+#import "std/std.gfl"
 
-proc fact(x: i64): i64 {
-  var res: i64  = 1;
-  var iter: i64 = x;
-  while 0 < iter {
-    res = res * iter;
-    iter = iter - 1;
-  }
-  return res;
+// NOTE: idk how to call it
+proc fcall(): i64 {
+  puts("Called fcall\n");
+  return 420;
+}
+proc optional_arg_w_fcall(x:i64= fcall()): i64 = x;
+
+proc optional_argument(arg1:i64=420): i64 {
+  return arg1;
 }
 
-proc sum_range(end: i64, begin:i64 = 0): i64{
-     // formula: (b²+b - a²-a)/2 b = end, a = begin
-     return (square(end) + end - square(begin) - begin) / 2;
+proc main(): i64 {
+  __print__(
+    optional_argument(69),
+    optional_argument(),
+    optional_arg_w_fcall(69),
+    optional_arg_w_fcall()
+  );
+  return 0;
 }
-
- 
-proc main(): void {
-  var x: i64  = sum_range(100);  // shall be 5050
-  var f5: i64 = fact(5);         // shall be 120
-  __print__(x, f5);
-  // expected output:
-  // 5050
-  // 120
-  
-
-}
-

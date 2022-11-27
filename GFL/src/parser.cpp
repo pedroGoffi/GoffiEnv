@@ -12,7 +12,7 @@
 #include "./grammar.cpp"
 #include "./ordering.cpp"
 AST_ROOT parser_run_code(const char* src);
-void parse_file(const char* file_path);
+Decl** parse_file(FILE* f);
 Expr* parse_plus_minus();
 Expr* parse_e0();
 Expr* parse_unary();
@@ -274,7 +274,35 @@ Type* parse_type(){
     return type;
   }
   assert(token.kind == TOKEN_NAME);
-  type->kind = TypeFieldKind_by_cstr(token.name);
+  
+  type->is_unsigned = false;
+  if(*token.name == 'u'){
+    type->is_unsigned = true;
+    token.name++;
+  }
+  type->size = 0;
+  if(*token.name == 'i'){
+    type->kind = TYPE_I64;
+    token.name++;
+    type->size = (size_t)atoi(token.name);
+    if(type->size != 8  and
+       type->size != 16 and
+       type->size != 32 and
+       type->size != 64       
+       )
+      {
+	fprintf(stderr,
+		"ERROR: type int expects 8, 16, 32 or 64.\n");
+	exit(1);
+      }
+    type->size /= 8;
+      
+  }
+  else {
+    type->kind = TypeFieldKind_by_cstr(token.name);
+    if(type->kind != TYPE_NONE and type->kind != TYPE_UNSOLVED)
+      type->size = sizeof_type(type);
+  }
   type->name = token.name;
   next_token();
   if(expect_token(TOKEN_OPEN_S_PAREN)){
@@ -291,10 +319,7 @@ Type* parse_type(){
     MustExpect(TOKEN_CLOSE_S_PAREN);    
     return t;
   }
-  if(type->kind != TYPE_NONE)
-    type->size = sizeof_type(type);
-  else
-    type->size = 0;
+
   return type;
 }
 TypeField* parse_typefield(){
@@ -559,14 +584,43 @@ Decl* parse_struct_def(){
 }
 
 Decl* parse_typedef(){
-  Type* type       = parse_type();
+  const char* name = consume().name;
+  MustExpect(TOKEN_EQ);
   Type* equivalent = parse_type();
   MustExpect(TOKEN_DOT_AND_COMMA);
   Decl* Typedef = new Decl;
   Typedef->kind = DeclKind::DECL_TYPEDEF;
-  Typedef->as.Typedef.type		= type;
-  Typedef->as.Typedef.type_equivalent	= equivalent;
+  Typedef->name = name;
+  Typedef->as.Typedef.name	= name;
+  Typedef->as.Typedef.type	= equivalent;
   return Typedef;
+}
+EnumFields* parse_enum_fields(){
+  MustExpect(TOKEN_OPEN_C_PAREN);
+  EnumFields* efs = new EnumFields;
+  size_t offset     = 0;
+  while(!is_token(TOKEN_CLOSE_C_PAREN)){
+    if(offset > 0){
+      MustExpect(TOKEN_COMMA);
+    }
+    EnumField* ef = new EnumField;
+    ef->name      = consume().name;
+    ef->offset    = offset++;
+    if(expect_token(TOKEN_EQ)){
+      ef->expr = parse_expr();
+    }
+    buf__push(efs->fields, ef);
+  }
+  MustExpect(TOKEN_CLOSE_C_PAREN);
+  return efs;
+}
+Decl* parse_enum(){
+  assert(token.kind == TOKEN_NAME);
+  Decl* Enum = new Decl;
+  Enum->kind = DECL_ENUM;
+  Enum->name = consume().name;
+  Enum->as.Enum.fields = parse_enum_fields();
+  return Enum;
 }
 Decl* parse_namespace(){
   MustExpectName(NAMESPACE_KEYWORD);
@@ -582,14 +636,20 @@ Decl* parse_namespace(){
   MustExpect(TOKEN_CLOSE_C_PAREN);  
   return ns;
 }
-void parse_import(){
-  printf("WARNING: import is not fully implemented.\n");
+Decl* parse_import(){
   MustExpectName("import");
-  Streams_push(stream);
-  parse_file(consume().name);
-  stream = Streams_pop();
-  next_token();
+  const char* fp = consume().name;
+  FILE* f = fopen(fp, "r");
+  assert(f);
+  Decl** ast = parse_file(f);
+  Decl* node = new Decl;
 
+  node->kind = DECL_IMPORT;
+  node->as.Import.path = fp;
+  node->name = node->as.Import.path;
+  node->as.Import.ast = ast;
+  return node;
+  
 }
 Decl* parse_decl(){
   if(expect_token(TOKEN_AT_SIGN)){
@@ -611,8 +671,7 @@ Decl* parse_decl(){
     return parse_typedef();
   }
   else if(expect_name(ENUM_KEYWORD)){    
-    fatal("parsing enums are not implemented yet\n");
-    exit(1);    
+    return parse_enum();
   }
   else if(expect_name(UNION_KEYWORD)){
     fatal("parsing unions are not implemented yet\n");
@@ -651,8 +710,14 @@ AST_ROOT parser_run_code(const char* src){
 
     if(expect_token(TOKEN_HASHTAG)){      
       if(token_is_name("import")){
-	parse_import();
+	const char* last_str = stream;
+
+	Decl* node = parse_import();
+	init_stream(last_str);
 	next_token();
+	buf__push(ast, node);
+
+	continue;
       }
       else {
 	fprintf(stderr,
@@ -671,19 +736,21 @@ AST_ROOT parser_run_code(const char* src){
     }
   
   }
-  return order_ast(ast);
+  return ast;
 }
 extern const char*  program;
-void parse_file(const char* file_path){
-  Module* mod = new Module;
-  mod->path = file_path;
-  const char* entry_content = get_file_text(file_path);  
-  if(!entry_content){
-    usage(stderr,  program);
-    printf("error: could not open the file: `%s`\n", file_path);
-    exit(1);
-  }
-  mod->ast = parser_run_code(entry_content);
-  Module_push(&modules, mod);
+Decl** parse_file(FILE* f){
+  char* str = NULL;
+  char c;
+  do{
+    c = (char)fgetc(f);
+    buf__push(str, c);
+  } while (c != EOF);
+  return parser_run_code(str);
+}
+Decl** parse_from_file(const char* file_path){
+  FILE* f = fopen(file_path, "r");
+  assert(f);
+  return parse_file(f);
 }
 #endif /* __parser */

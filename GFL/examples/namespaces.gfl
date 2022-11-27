@@ -1,0 +1,19 @@
+#import "std/std.gfl"
+
+
+  proc Main(str: *char): i64 { 
+    if streq(str, "init"){
+      puts("Initializing gfl.\n");
+      return 0;
+    }
+    puts("ERR:\n");
+    exit(1);
+  }
+
+
+proc main(): void {
+  Main("init");
+  Main("spelling wrong example");
+  
+}
+

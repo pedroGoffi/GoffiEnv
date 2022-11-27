@@ -1,6 +1,8 @@
+// NOTE: INIT_MAX_STR is a 258 array
+INIT_MAX_STR    :: "                                                                                                                                                                                                                                                                  "
 proc write(fd: i64, ptr: i64, ptr_len: i64):void = SYSCALL3(fd, ptr, ptr_len, SYS_write);   
 
-proc putsf(ptr: *char, ptr_len: i64):void = write(stdout, ptr, ptr_len);
+
 
 proc strlen(str: *char): i64{
   var len: i64 = 0;
@@ -12,14 +14,16 @@ proc strlen(str: *char): i64{
   return len;
   
 }
+
 proc streq(a: *char, b: *char): i64{
   // we'll loop so to avoid destruct the original variable
+  
   var str1: *char = a;
   var str2: *char = b;
   var s1: i64 = strlen(str1);
   var s2: i64 = strlen(str2);
   
-  if((s1 < s2) + (s2 < s1)) {return false;}
+  if ((s1 < s2) + (s2 < s1)) {return false;}
   while 0 < *str1 {
     if (*str1 < *str2) + (*str2 < *str1) { 
       return false;
@@ -29,7 +33,51 @@ proc streq(a: *char, b: *char): i64{
   }
   return true;
 }
+
+proc putsf(fd:i64, ptr: *char):void {
+  var size: i64 = strlen(ptr);
+  write(fd, ptr, size);
+}
 proc puts(ptr: *char): void {
   var size: i64 = strlen(ptr);
-  putsf(ptr, size);
+  write(stdout, ptr, size);
+}
+
+MAX_W_SIZE :: 256
+proc input(msg: *char=""): *char{
+  puts(msg);
+  // TODO: make arrays for god sake
+  var res: *char = INIT_MAX_STR;
+  // 258 bytes lol
+  var len: i64 = MAX_W_SIZE;
+  SYSCALL3(stdin, res, len, SYS_read);
+  // chop the new line at the end
+  len = 0;
+  var iter: *char = res;
+  while 10 < *iter{
+    iter = iter + 1;
+    len  = len + 1;
+  }  
+
+  var last_digit:*char = (:*char)(res + len);
+  *last_digit = 0;
+  // FIXME: code will not run if: *(:*char)(res + len) = 0;
+
+  return res;
+}
+
+proc stoi(str: *char): i64{
+  var str_begin: *char = str;
+  if *str_begin == 0{
+    puts("ERROR: can not convert string to integer, got NULL string.\n");
+    SYSCALL1(1, 60);
+  }
+  var result: i64 = 0;
+  while 0 < *str_begin {
+    var digit: i64 = *str_begin - '0';
+    result = result * 10;
+    result = result + digit;    
+    str_begin = str_begin + 1;    
+  }
+  return result; 
 }

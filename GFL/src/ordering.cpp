@@ -8,6 +8,7 @@ typedef struct Entity Entity;;
 typedef struct VarEntity VarEntity;
 typedef struct ResolvedExpr ResolvedExpr;
 ResolvedExpr* order_expr(Expr* e);
+Decl** order_ast(Decl** ast);
 
 void order_name(const char* name);
 void order_decl_var(Decl* decl);
@@ -49,8 +50,13 @@ Sym* sym_get(const char* name){
   return nullptr;
 }
 
-void sym_push(Decl* decl){
-  assert(decl->name);
+void sym_push(Decl* decl){  
+  if(!decl->name){
+    print_decl(decl);
+    fatal("INTERNAL ERROR: sym_push: decl->name not found\n");
+    return;
+    exit(1);
+  }
   if(sym_get(decl->name)){
     fprintf(stderr,
 	    "ERROR: duplicated name '%s'.\n",
@@ -63,6 +69,30 @@ void sym_push(Decl* decl){
     .state  = SymState::UNORDERED
   };
   buf__push(sym_list, pushable);
+}
+struct Typedef {
+  const char* name;
+  Type*       type;
+};
+Typedef** typedefs = NULL;
+Typedef* Typedef_get(const char* name){
+  for(size_t i=0; i < buf__len(typedefs); ++i){
+    if(STR_CMP(typedefs[i]->name, name)) return typedefs[i];
+  }
+  return NULL;
+}
+void Typedef_push(const char* name, Type* type){
+  assert(!Typedef_get(name));
+  buf__push(typedefs, new Typedef{
+      .name = name,
+      .type = type
+    });
+}
+Type* complete_type(Type* t){
+  assert(t->kind == TYPE_UNSOLVED);  
+  Typedef* tf = Typedef_get(t->name);
+  assert(tf);
+  return tf->type;
 }
 Type* order_type(Type* type){
   switch(type->kind){
@@ -77,21 +107,38 @@ Type* order_type(Type* type){
   case TYPE_PTR:
     // NOTE: ptr is not ordered for now
     break;
+  case TYPE_UNSOLVED: return complete_type(type);
   default:
     fprintf(stderr,
 	    "ERROR: unhandled type kind at order_typefield.\n");
     exit(1);
+
   }
   return type;
 }
+
+
 void order_decl_var(Decl* decl){
   // TODO :order_type_field(var->type_field);
-  Type* var_type = order_type(decl->as.varDecl.type_field->type);
+  Type* vt = decl->as.varDecl.type_field->type;
+  if(vt->kind == TYPE_UNSOLVED){
+    vt = complete_type(vt);
+  }
+  Type* var_type = order_type(vt);  
   if(decl->as.varDecl.expr){
     ResolvedExpr* rexpr = order_expr(decl->as.varDecl.expr);
     (void) rexpr;
     printf("[WARNING]: type check is not on for testing.\n");
     //type_check(var_type, rexpr->type, "at var declaration");    
+  }
+}
+void order_decl_import(Decl* decl){
+  assert(decl->kind = DECL_IMPORT);
+  Decl** ast_node = decl->as.Import.ast;
+  for(size_t i=0; i<buf__len(decl); ++i){
+    Decl* node = ast_node[i];
+    sym_push(node);
+    printf("node = %s\n", node->name);
   }
 }
 void order_decl_proc(Decl* decl){
@@ -167,11 +214,8 @@ ResolvedExpr* order_expr(Expr* e){
     Sym* proc_sym = sym_get(p_name);
     // The procedure exists ?
     if(!proc_sym){
-      fprintf(stderr,
-	      "ERROR: the procedure '%s()' was not declared in this scope.\n",
-	      p_name);
-      // TODO: print procedure
-      exit(1);
+      type->kind = TYPE_UNSOLVED;
+      break;
     }
     // the call match args and the procedure declaration is equal ?
     ProcArgs* proc_args = proc_sym->decl->as.procDecl.args;
@@ -228,15 +272,21 @@ void order_decl(Decl* decl){
   case DeclKind::DECL_PROC:   
     order_decl_proc(decl);
     break;
-  case DeclKind::DECL_UNION:
   case DeclKind::DECL_ENUM:
+    break;
+  case DeclKind::DECL_UNION:
   case DeclKind::DECL_STRUCT:   
     order_decl_struct(decl);
     break;
   case DeclKind::DECL_TYPEDEF:
+    Typedef_push(decl->as.Typedef.type->name,
+		 decl->as.Typedef.type);
+    break;
+  case DeclKind::DECL_IMPORT: {
+    order_decl_import(decl);
+  } break;
   case DeclKind::DECL_NAMESPACE:
     break;
-  case DeclKind::DECL_CIMPORT:
   case DeclKind::DECL_NONE:
   default:
     fprintf(stderr,
@@ -260,9 +310,12 @@ void order_name(const char* name){
   Sym* sym = sym_get(name);
 
   if(!sym){
-    fprintf(stderr,
-	    "ERROR: the name '%s' was not declared in this scope.\n", name);
-    exit(1);
+    if(!GFL_Macros_find(name)){
+      fprintf(stderr,
+	      "ERROR: the name '%s' was not declared in this scope.\n", name);
+      exit(1);
+    }
+    return;
   }
   if(sym->state == SymState::ORDERED) return;
   if(sym->state == SymState::ORDERING){
@@ -286,10 +339,19 @@ void order_sym_list(){
 Decl** order_ast(Decl** ast){
   // TODO: order ast is not fully implemented
   for(size_t i=0; i < buf__len(ast); i++){
-    sym_push(ast[i]);
+    Decl* d = ast[i];
+    if(d->kind == DECL_IMPORT) {
+      Decl** n = ast[i]->as.Import.ast;
+      for(size_t j=0; j < buf__len(n); ++j){
+	sym_push(n[j]);
+      }
+    }
+    else {
+      sym_push(d);
+    }
+    
   }
-  order_sym_list();  
- 
+  order_sym_list(); 
   return ordered_decls;
 }
 void order_test(){

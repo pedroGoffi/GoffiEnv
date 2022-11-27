@@ -1,0 +1,37 @@
+
+
+proc tb_set(ptr: *i64, val: i64): void {
+  *ptr = val;  
+}
+proc tb_next(ptr:*i64, val: i64): void {
+  ptr = ptr + 1;
+  tb_set(ptr, val);
+}
+proc tb_init(ptr: *i64): void {
+   tb_set (ptr, 0); // 0
+   tb_next(ptr, 1); // 1
+   tb_next(ptr, 1); // 2
+   tb_next(ptr, 1); // 3
+   tb_next(ptr, 0); // 4
+   tb_next(ptr, 1); // 5
+   tb_next(ptr, 1); // 6
+   tb_next(ptr, 0); // 7
+}
+proc main(): void{
+   var heap_base   :*i64;
+   var table_base  : i64 = &heap_base;
+   tb_init(&table_base);
+   
+   var i: i64 = 0;
+   var table_size  : i64 = 8;
+   whi
+   le i < table_size {
+       var cell_ptr: *i64;
+       var cell: i64;
+       cell_ptr  = table_base + i;
+       cell      = *cell_ptr;
+       *cell_ptr = cell + 48;
+    
+     i = i + 1;
+   }
+}

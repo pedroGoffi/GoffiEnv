@@ -1,6 +1,0 @@
-#include <cstdio>
-void dump(int x){}
-int main(){
-  const char* str = "hello, world";
-  dump(str[0]);
-}
