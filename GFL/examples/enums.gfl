@@ -3,6 +3,12 @@ enum Enum{
   B,
   C
 }
+
+
 proc main(): void {
-  __print__(A, B, C);
+  __print__(
+    A,
+    B,
+    C
+  );
 }

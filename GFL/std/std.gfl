@@ -330,11 +330,11 @@ EXIT_FAILURE			:: 1
 _ExitOK				:: SYSCALL1(EXIT_OK,      SYS_exit)
 _ExitFailure			:: SYSCALL1(EXIT_FAILURE, SYS_exit)
 
-
 #import "std/string.gfl"
 #import "std/math.gfl"
 #import "std/file.gfl"
 #import "std/bool.gfl"
+
 
 proc exit(exit_code: i64):void = SYSCALL1(exit_code, 60);
 proc eq_i64(x: i64, y: i64)    = ((x < y) + (y < x) == 0);

@@ -1,0 +1,15 @@
+#import "std/std.gfl"
+
+proc main(): void {
+  var input_fp: *char = "out";
+  putln(strcat(input_fp, ".asm"));
+  putln(strcat(input_fp, ".c"));
+  var dc: *char = strcat(input_fp, ".c"); // out.c
+  if streq(dc, "out.c") == 0{
+    putln("OK");
+  }
+  elif streq(strcat(input_fp, ".asm"), "out.asm"){
+    putln("OK\n");  
+  }  
+  
+}

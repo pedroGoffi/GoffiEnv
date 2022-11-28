@@ -3,19 +3,23 @@
 #include "./ast.cpp"
 
 // compiler behaviour vars
-static bool  load_vars = true;
-static bool  ns_ctx    = false;
-static char* ns_name   = NULL;
+
+static bool  load_vars			= true;
+static bool  ns_ctx			= false;
+static char* ns_name			= NULL;
+static const char* current_reasign_var	= NULL;
 
 int     DEBUG_COUNT = 0;
 #define DEBUG_OK							\
-  if(1) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
+  if(0) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
 #define unimplemented(st)				\
   printf("UNIMEPLMENTED %s: %s\n", __FUNCTION__, #st);	\
   exit(1);
 #define unreachable()					\
   printf("ERROR: unrechable %s.\n", __FUNCTION__);	\
   exit(1);
+
+
 
 int align_to(int n, int align) {
   return (n + align - 1) / align * align;
@@ -165,6 +169,19 @@ static const char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 //  {f64i8, f64i16, f64i32, f64i64, f64u8, f64u16, f64u32, f64u64, f64f32, NULL,   f64f80}, // f64
 //  {f80i8, f80i16, f80i32, f80i64, f80u8, f80u16, f80u32, f80u64, f80f32, f80f64, NULL},   // f80
 //};
+bool typecheck_var(Var* var, Type* var_expr_type){  
+  if(!Type_cmp(var->type_field->type, var_expr_type)){
+    return false;
+  }
+  return true;
+}
+bool typecheck_param(Var* var, Type* var_expr_type){
+  if(!Type_cmp(var->type_field->type, var_expr_type)){
+    return false;
+  }
+  return true;
+}
+  
 
 static int count(void) {
   static int i = 1;
@@ -270,19 +287,36 @@ static void store(Type* ty){
 static Var* Expr_get_var(Expr* expr){
   unreachable();
 }
-static int push_callargs(Expr** args){
+static int push_callargs(Proc* proc, Expr** args){
   int stack=0;
 
   for(size_t i=0; i < buf__len(args); ++i){
     if( i >= MAX_ARGREG64 ){      
       for(size_t j=i; j < buf__len(args); ++j){
-	gen_expr(args[j]);
+	Var* vparam = proc->args->vars[i];
+	assert(vparam);
+	Type* texpr = gen_expr(args[j]);
+	if(!typecheck_param(vparam, texpr)){
+	  fprintf(stderr,
+		  "ERROR: can not call the procedure %s, because the %zu-nth arguemnt does not match the call.\n",
+		  proc->name,
+		  i);
+	  exit(1);
+	}
 	push();
 	stack++;
       }
       return stack;
     }
-    gen_expr(args[i]);
+    Var* vparam = proc->args->vars[i];    
+    Type* texpr = gen_expr(args[i]);
+    if(!typecheck_param(vparam, texpr)){
+      fprintf(stderr,
+	      "ERROR: can not call the procedure %s, because the %zu-nth arguemnt does not match the call.\n",
+	      proc->name,
+	      i);
+      exit(1);
+    }
     println("\tmov %s, rax", argreg64[i]);
   }
   return stack;
@@ -508,19 +542,23 @@ static Type* gen_expr(Expr* expr){
   case EXPRKIND_NAME: {    
     if(Var* lv = Var_get(&local_vars, expr->name)){
       gen_addr(lv);
+      current_reasign_var = expr->name;
       if(load_vars) {
 	load(lv->type_field->type);
-	return lv->type_field->type;
+
       }
-      return Type_ptr(lv->type_field->type);
+      current_reasign_var = expr->name;
+      return lv->type_field->type;
+
     }
     else if(Var* gv = Var_get(&global_vars, expr->name)){
       println("\tmov rax, %s", gv->type_field->name);
+      current_reasign_var = expr->name;
       if(load_vars) {
 	load(gv->type_field->type);
 	return gv->type_field->type;
       }
-      return Type_ptr(gv->type_field->type);
+      return gv->type_field->type;
     }
     else if (Macro* macro = GFL_Macros_find(expr->name)){
       return gen_expr(macro->expr);
@@ -572,7 +610,7 @@ static Type* gen_expr(Expr* expr){
 	}	
       }
     }
-    int stack_args = push_callargs(call->args);
+    int stack_args = push_callargs(proc, call->args);
     int gp = 0, fp = 0;    
     println("\tcall %s", call->p_name);
     if(stack_args > 0) {
@@ -607,12 +645,25 @@ static Type* gen_expr(Expr* expr){
   } break;
   case EXPRKIND_REASIGN: {    
     load_vars = false;
-    Type* tfrom = gen_expr(expr->as.Reasign.from);
+    // NOTE: gen_expr will generate the addr of the variable
+    // then it will be a ptr to the var
+    // we'll derref that to reach the var type
+    Type* tvar = gen_expr(expr->as.Reasign.from);
     load_vars = true;
     push();
-    gen_expr(expr->as.Reasign.to);
-    store(tfrom);
-    return tfrom;
+    Type* texpr = gen_expr(expr->as.Reasign.to);
+    // TODO: automatic cast
+    if (!Type_cmp(tvar, texpr)){
+      fprintf(stderr,
+    	      "ERROR: can not re-asign the var '%s' from type '%s' to an type '%s'.\n",
+	      current_reasign_var,
+    	      typekind_cstr(tvar), 
+    	      typekind_cstr(texpr));
+      exit(1);
+    }
+    store(tvar);
+    DEBUG_OK;
+    return tvar;
   } break;
   case EXPR_BINARY_OP: {
 #define bin(op, reg_a, reg_b) println("\t%s %s, %s", op, reg_a, reg_b)
@@ -667,13 +718,14 @@ static Type* gen_expr(Expr* expr){
     }
     bin(op, "rax", "rbx");
 #undef bin
-  } break;
+  } return Type_int();
+    
   case EXPRKIND_CAST:
     gen_expr(expr->as.Cast.expr);
     return expr->as.Cast.type->type;
   case EXPR_COMPARASION: 
     gen_expr_cmp(expr);
-    break;
+    return Type_int();
   case EXPRKIND_LOCAL_IF: {
     static size_t local_if_count = 0;
     gen_expr(expr->as.local_if.cond);
@@ -685,16 +737,19 @@ static Type* gen_expr(Expr* expr){
     gen_expr(expr->as.local_if.else_body);
     println(".L.LOCAL_IF_END.%zu:", local_if_count);
     local_if_count++;
-  } break;
-  case EXPRKIND_NEG:
+  } return Type_int();
+    
+  case EXPRKIND_NEG: {
     // TODO: expr with Type
     gen_expr(expr->as.expr);
-    println("\tneg rax");
-    break;
+    println("\tnot rax");
+  } return Type_int();
+    
   default:
     print_expr(expr);
     unreachable();
   }
+  return Type_none();
 }
 
 static void gen_stmt(Stmt* stmt){
@@ -742,29 +797,49 @@ static void gen_stmt(Stmt* stmt){
     }
     println(".L.else.end.%i:", end_lb);
   } break;
-  case STMTKIND_RETURN:
+  case STMTKIND_RETURN: {
     if(current_decl->as.procDecl.ret_type->kind == TYPE_NONE){
       fprintf(stderr,
 	      "ERROR: return only works in non-void procedures.\n");
       exit(1);
     }
-    if(stmt->as.expr){
-      gen_expr(stmt->as.expr);      
+    Type* got_type = stmt->as.expr ? gen_expr(stmt->as.expr) : Type_none();
+    Type* expected_type = current_decl->as.procDecl.ret_type;
+    //if(stmt->as.expr){      
+    //  tret = gen_expr(stmt->as.expr);      
+    //}
+
+    if(!Type_cmp(got_type, expected_type)){
+      fprintf(stderr,
+	      "ERROR: expected type '%s' in early return inside procedure '%s', but got type '%s'.\n",
+	      typekind_cstr(expected_type),
+	      current_decl->as.procDecl.name,
+	      typekind_cstr(got_type));
+      exit(1);
     }
     assert(current_decl);
     println("\tjmp .L.return.%s", current_decl->as.procDecl.name);
-    break;
-  case STMTKIND_LOCAL_VAR:
+  } break;
+  case STMTKIND_LOCAL_VAR: {
     Var_push(&local_vars, stmt->as.var);
     if(stmt->as.var->expr){
       Var* lv = stmt->as.var;
+      Type* tvar = lv->type_field->type;
       gen_addr(lv);
       push();
-      gen_expr(lv->expr);
-      //store(v);
+      Type* texpr = gen_expr(lv->expr);                 
+      if(!typecheck_var(lv, texpr)){
+	  fprintf(stderr,
+		  "ERROR: can not asign the local variable %s of type %s to an type %s.\n",
+		  lv->type_field->name,
+		  typekind_cstr(tvar),
+		  typekind_cstr(texpr));
+	  exit(1);
+      }
+      
       store(lv->type_field->type);
     }
-    break;
+  } break;
   case STMTKIND_WHILE:{
     while_lb = count();
     int saved_lb = while_lb;
@@ -996,7 +1071,17 @@ void AssemblerAST(Decl** ast, const char* output_fp){
   for(size_t i=0; i < buf__len(global_vars); ++i){
     Var* global_var = global_vars[i];
     if(global_var->expr){
-      gen_expr(global_var->expr);
+      Type* texpr = gen_expr(global_var->expr);
+      if(!typecheck_var(global_var, texpr)){
+	fprintf(stderr,
+		"ERROR: can not asign the global variable %s of type %s to an type %s.\n",
+	        global_var->type_field->name,
+		typekind_cstr(global_var->type_field->type),
+		typekind_cstr(texpr));
+	exit(1);
+      }
+      
+    
       println("\tmov rdi, %s", global_var->type_field->name);
       println("\tmov [rdi], rax");
     }

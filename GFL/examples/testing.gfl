@@ -1,19 +1,11 @@
-#import "std/std.gfl"
-HEISENBERG :: 420
+#import "std/std.gfl" 
 
-proc say_my_name(name: *char): i64{
-  if streq(name, "heinsenberg")
-       return true;
-  else return false;
-}
 
+proc some(x: i64): *char = return  "hello, world\n";
 proc main(): void {
-  if      say_my_name("heinsenberg" if 1 else "aisenberg") if HEISENBERG
-     else say_my_name("not heinsenberg")
-  {
-    puts("True");
-  } else 
-    puts("False");
-  
-  
+  var str: *char = some(1);
+  puts(str);
+  //*str = 1;
+  //puts(str, 1);
+  //str = 1; 
 }

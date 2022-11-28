@@ -434,7 +434,10 @@ Stmt* parse_stmt(){
   Stmt* s = new Stmt;
   if(expect_name(RETURN_KEYWORD)){
     s->kind = STMTKIND_RETURN;
-    s->as.expr = parse_expr();
+    s->as.expr = NULL;
+    if(!is_token(TOKEN_DOT_AND_COMMA)){
+      s->as.expr = parse_expr();
+    }
     MustExpect(TOKEN_DOT_AND_COMMA);
   }
   else if(expect_name(BREAK_KEYWORD)){
@@ -455,8 +458,7 @@ Stmt* parse_stmt(){
   else if(expect_name(VAR_KEYWORD)){
     s->kind = STMTKIND_LOCAL_VAR;
     s->as.var = parse_var_def();
-    current_proc_reserve_memory(s->as.var);
-    printf("allocated %i\n", current_proc->stack_allocation);
+    current_proc_reserve_memory(s->as.var);    
   }
   else if(token_is_name(WHILE_KEYWORD)){
     s = parse_while();

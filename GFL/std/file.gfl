@@ -11,27 +11,36 @@ O_ALL				:: O_READONLY
 
 AT_FDCWD                        :: -100 				 
 proc fopen(path: *char, flag: i64): i64{
-  return SYSCALL3(AT_FDCWD, path, flag, SYS_openat);	   
+  return (:i64)(SYSCALL3(AT_FDCWD, path, flag, SYS_openat));	   
   
 }
-proc open(path: *char, flags: *char): i64 {
+proc open(path: *char, flagstr: *char): i64 {
   var flag: i64 = 0;
-  while 0 < *flags{
-    if *flags == 'w' {
+  
+  while 0 < *flagstr{    
+    if *flagstr == 'w' {
       flag = flag + O_WRONLY;
     }
-    if *flags == 'r' {
-    flag = flag + O_READONLY;
+    elif *flagstr == 'r' {
+      flag = flag + O_READONLY;
     }
-    elif *flags == 'a'{
-      flag = O_ALL;
-      break;
+    elif *flagstr == 'a'{
+      flag = flag + O_APPEND;
     }
     else {
-      puts("ERROR: undefined flag in open procedure.\n");
+      puts("ERROR: undefined flag in open procedure: ascii="); 
+      __print__(*flagstr); 
       exit(1);
     }
-    flags = flags + 1;
+    flagstr = (:*char)(flagstr + 1);
   }
-  return fopen(path, flag);
+  
+  var fd: i64 = fopen(path, flag);
+  if  fd < 0 {
+    puts("ERROR: could not open the file: '");
+    puts(path);
+    puts("'\n");
+    exit(1);
+  }
+  return fd;
 }

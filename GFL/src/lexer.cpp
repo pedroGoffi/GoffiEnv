@@ -314,7 +314,6 @@ void next_token(){
     kind2('=', TOKEN_EQ, TOKEN_CMP_EQ);
 #undef kind2
   default:
-    fatal("[WARNING]: unexpected token starts with '%c'.\n", *stream);
     stream++;
     goto __next_token;
     break;    

@@ -312,13 +312,23 @@ TypeFieldKind TypeFieldKind_by_cstr(const char* type){
 #undef DOIF_TYPE
   return TYPE_UNSOLVED;
 }
-const char* typekind_cstr(TypeKind kind){
+const char* typekind_cstr(Type* t){
+  TypeKind kind = t->kind;
   switch(kind){
   case TypeKind::TYPE_NONE: return "void";
   case TypeKind::TYPE_I64:  return "i64";
-  case TypeKind::TYPE_PTR:  return "pointer";
-  case TypeKind::TYPE_F64: 
-  case TypeKind::TYPE_CHAR:
+  case TypeKind::TYPE_CHAR: return "char";
+  case TypeKind::TYPE_PTR:  {
+    assert(t->ptr.base);
+    char* base = NULL;
+    buf__push(base, '*');
+    const char* body = typekind_cstr(t->ptr.base);
+    for(size_t i=0; i < strlen(body); ++i){
+      buf__push(base, *(body + i));
+    }    
+    return base;
+  }
+  case TypeKind::TYPE_F64:   
   case TypeKind::TYPE_ARRAY:
   case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
@@ -390,12 +400,11 @@ int sizeof_type(Type* type){
   }
   return 0;
 }
+
 bool Type_cmp(Type* a, Type* b){
   if(a->kind == TYPE_PTR and b->kind == TYPE_PTR){
     return Type_cmp(a->ptr.base, b->ptr.base);
   }
-  assert(a);
-  assert(b);
   return a->kind == b->kind;
 }
 Type* derref_type(Type* type){
