@@ -11,7 +11,7 @@ O_ALL				:: O_READONLY
 
 AT_FDCWD                        :: -100 				 
 proc fopen(path: *char, flag: i64): i64{
-  return (:i64)(SYSCALL3(AT_FDCWD, path, flag, SYS_openat));	   
+  return SYSCALL3(AT_FDCWD, path, flag, SYS_openat) as i64;
   
 }
 proc open(path: *char, flagstr: *char): i64 {

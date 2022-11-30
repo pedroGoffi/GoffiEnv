@@ -1,0 +1,11 @@
+proc main(): void {
+  var x: i64 = 7; // 7
+  __print__(x);
+  x   = x << 1; // 14
+  __print__(x);
+  x   = x << 3; // 112
+  __print__(x);
+  x   = x << 2; // 192
+  __print__(x);
+  
+}

@@ -276,8 +276,7 @@ void next_token(){
       stream++;								\
       token.name          = #k;						\
       break;
-    // ------------------------------
-    kind1('!',  TOKEN_BANG);
+    // ------------------------------    
     kind1('#',  TOKEN_HASHTAG);
     kind1('$',  TOKEN_DOLLAR);
     kind1('&',  TOKEN_AMPERSAND);
@@ -288,8 +287,8 @@ void next_token(){
     kind1('[',  TOKEN_OPEN_S_PAREN);
     kind1(']',  TOKEN_CLOSE_S_PAREN);
     kind1(';',  TOKEN_DOT_AND_COMMA);
-    kind1('<',  TOKEN_LESS);
-    kind1('>',  TOKEN_GREATER);
+    
+    
     kind1('?',  TOKEN_QUESTION_MARK);
     kind1('(',  TOKEN_OPEN_R_PAREN);
     kind1(')',  TOKEN_CLOSE_R_PAREN);
@@ -308,11 +307,56 @@ void next_token(){
       token.name          = str_intern_range(stream_begin, stream);\
       break;
     // ------------------------------
-    kind2('-', TOKEN_TAKEAWAY, TOKEN_DLESS);
-    kind2('+', TOKEN_PLUS, TOKEN_DPLUS);
+    
     kind2(':', TOKEN_DOUBLE_DOT, TOKEN_ACCESS_FIELD);
     kind2('=', TOKEN_EQ, TOKEN_CMP_EQ);
 #undef kind2
+    //kind1('<',  TOKEN_LESS);
+#define kind3(f, fk, s, sk)			\
+    case f:{					\
+      token.kind = fk;				\
+      token.name = #f;				\
+      stream++;					\
+      if(*stream == s){				\
+	token.kind = sk;			\
+	token.name = #s;			\
+	stream++;				\
+      }						\
+    } break;
+    kind3('!', TOKEN_BANG,	'=', TOKEN_CMP_NEQ);
+#define kind4(f, fk, s, sk, t, tk)		\
+    case f:					\
+      token.kind = fk;				\
+      token.name = #f;				\
+      stream++;					\
+      if(*stream == s){				\
+	token.kind = sk;			\
+	token.name = #f #s;			\
+	stream++;				\
+      }						\
+      else if (*stream == t){			\
+	token.kind = tk;			\
+	token.name = #f #t;			\
+	stream++;				\
+      }						\
+      break;
+    kind4('<', TOKEN_LESS,	'<', TOKEN_SHL,   '=', TOKEN_LESSEQ);
+    kind4('>', TOKEN_GREATER,	'>', TOKEN_SHR,   '=', TOKEN_GREATEREQ);
+    kind4('-', TOKEN_TAKEAWAY,  '-', TOKEN_DLESS, '=', TOKEN_EQLESS);
+    kind4('+', TOKEN_PLUS,      '+', TOKEN_DPLUS, '=', TOKEN_EQPLUS);
+    
+      //kind2('-', TOKEN_TAKEAWAY, TOKEN_DLESS); 
+      //kind2('+', TOKEN_PLUS, TOKEN_DPLUS);
+    //case '<':
+  //  token.kind = TOKEN_LESS;
+  //  stream++;
+  //  token.name = "<";
+  //  if(*stream == '='){
+  //    token.kind = TOKEN_LESSEQ;
+  //    stream++;
+  //    token.name = "<=";
+  //  }
+  //  break;
   default:
     stream++;
     goto __next_token;

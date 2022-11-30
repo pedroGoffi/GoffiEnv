@@ -1,84 +1,8 @@
-#ifndef __assembler
-#define __assembler
+#ifndef __asmx86_64_compiler
+#define __asmx86_64_compiler
 #include "./ast.cpp"
-
-// compiler behaviour vars
-
-static bool  load_vars			= true;
-static bool  ns_ctx			= false;
-static char* ns_name			= NULL;
-static const char* current_reasign_var	= NULL;
-
-int     DEBUG_COUNT = 0;
-#define DEBUG_OK							\
-  if(0) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
-#define unimplemented(st)				\
-  printf("UNIMEPLMENTED %s: %s\n", __FUNCTION__, #st);	\
-  exit(1);
-#define unreachable()					\
-  printf("ERROR: unrechable %s.\n", __FUNCTION__);	\
-  exit(1);
-
-
-
-int align_to(int n, int align) {
-  return (n + align - 1) / align * align;
-}
+#include "./compiler.cpp"
 static Type* gen_expr(Expr* expr);
-static void gen_expr_cmp(Expr* expr);
-
-size_t rbp_stack_offset = 0;
-Var**  local_vars	= NULL;
-Var**  global_vars	= NULL;
-const char** strings	= NULL;
-Proc** procs		= NULL;
-Proc* Proc_get(Proc*** procs, const char* name){
-  for(size_t i=0; i < buf__len(*procs); ++i){
-    if(STR_CMP((*procs)[i]->name, name))
-      return (*procs)[i];
-  }
-  return NULL;
-}
-Var* Var_get(Var*** vars, const char* name){
-  for(size_t i=0; i < buf__len(*vars); ++i){
-    if(STR_CMP((*vars)[i]->type_field->name, name)){
-      return (*vars)[i];
-    }
-  }
-  return NULL;
-}
-void  Proc_push(Proc*** procs, Decl* decl){
-  assert(decl->kind == DECL_PROC);
-  if(Proc_get(procs, decl->name)){
-    fprintf(stderr,
-	    "ERROR: the procedure '%s' was already declared.\n",
-	    decl->name);
-    exit(1);
-  }
-
-  buf__push(*procs, &decl->as.procDecl);
-  
-}
-
-void Var_push(Var*** vars, Var* var){
-  assert(!Var_get(vars, var->type_field->name));
-  buf__push(*vars, var);
-}
-Var* Var_from_expr(Expr* expr){
-  if(expr->kind != EXPRKIND_NAME){
-    unreachable();
-  }
-  Var* lv = Var_get(&local_vars, expr->name);
-  if(lv) return lv;
-  
-  Var* gv = Var_get(&global_vars, expr->name);
-  if(gv) return gv;
-  
-  unreachable();
-}
-static FILE* output_file;
-static int   depth;
-static Decl* current_decl;
 
 static const char* argreg8[]  = {"dil", "sil", "dl", "cl", "r8b", "r9b"};
 static const char *argreg16[] = {"di", "si", "dx", "cx", "r8w", "r9w"};
@@ -86,112 +10,111 @@ static const char *argreg32[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
 static const char *argreg64[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 #define MAX_ARGREG64 6
 
-//// The table for type casts
-//static char i32i8[] = "movsbl %al, %eax";
-//static char i32u8[] = "movzbl %al, %eax";
-//static char i32i16[] = "movswl %ax, %eax";
-//static char i32u16[] = "movzwl %ax, %eax";
-//static char i32f32[] = "cvtsi2ssl %eax, %xmm0";
-//static char i32i64[] = "movsxd %eax, %rax";
-//static char i32f64[] = "cvtsi2sdl %eax, %xmm0";
-//static char i32f80[] = "mov %eax, -4(%rsp); fildl -4(%rsp)";
-//
-//static char u32f32[] = "mov %eax, %eax; cvtsi2ssq %rax, %xmm0";
-//static char u32i64[] = "mov %eax, %eax";
-//static char u32f64[] = "mov %eax, %eax; cvtsi2sdq %rax, %xmm0";
-//static char u32f80[] = "mov %eax, %eax; mov %rax, -8(%rsp); fildll -8(%rsp)";
-//
-//static char i64f32[] = "cvtsi2ssq %rax, %xmm0";
-//static char i64f64[] = "cvtsi2sdq %rax, %xmm0";
-//static char i64f80[] = "movq %rax, -8(%rsp); fildll -8(%rsp)";
-//
-//static char u64f32[] = "cvtsi2ssq %rax, %xmm0";
-//static char u64f64[] =
-//  "test %rax,%rax; js 1f; pxor %xmm0,%xmm0; cvtsi2sd %rax,%xmm0; jmp 2f; "
-//  "1: mov %rax,%rdi; and $1,%eax; pxor %xmm0,%xmm0; shr %rdi; "
-//  "or %rax,%rdi; cvtsi2sd %rdi,%xmm0; addsd %xmm0,%xmm0; 2:";
-//static char u64f80[] =
-//  "mov %rax, -8(%rsp); fildq -8(%rsp); test %rax, %rax; jns 1f;"
-//  "mov $1602224128, %eax; mov %eax, -4(%rsp); fadds -4(%rsp); 1:";
-//
-//static char f32i8[] = "cvttss2sil %xmm0, %eax; movsbl %al, %eax";
-//static char f32u8[] = "cvttss2sil %xmm0, %eax; movzbl %al, %eax";
-//static char f32i16[] = "cvttss2sil %xmm0, %eax; movswl %ax, %eax";
-//static char f32u16[] = "cvttss2sil %xmm0, %eax; movzwl %ax, %eax";
-//static char f32i32[] = "cvttss2sil %xmm0, %eax";
-//static char f32u32[] = "cvttss2siq %xmm0, %rax";
-//static char f32i64[] = "cvttss2siq %xmm0, %rax";
-//static char f32u64[] = "cvttss2siq %xmm0, %rax";
-//static char f32f64[] = "cvtss2sd %xmm0, %xmm0";
-//static char f32f80[] = "movss %xmm0, -4(%rsp); flds -4(%rsp)";
-//
-//static char f64i8[] = "cvttsd2sil %xmm0, %eax; movsbl %al, %eax";
-//static char f64u8[] = "cvttsd2sil %xmm0, %eax; movzbl %al, %eax";
-//static char f64i16[] = "cvttsd2sil %xmm0, %eax; movswl %ax, %eax";
-//static char f64u16[] = "cvttsd2sil %xmm0, %eax; movzwl %ax, %eax";
-//static char f64i32[] = "cvttsd2sil %xmm0, %eax";
-//static char f64u32[] = "cvttsd2siq %xmm0, %rax";
-//static char f64i64[] = "cvttsd2siq %xmm0, %rax";
-//static char f64u64[] = "cvttsd2siq %xmm0, %rax";
-//static char f64f32[] = "cvtsd2ss %xmm0, %xmm0";
-//static char f64f80[] = "movsd %xmm0, -8(%rsp); fldl -8(%rsp)";
-//
-//#define FROM_F80_1                                           \
-//  "fnstcw -10(%rsp); movzwl -10(%rsp), %eax; or $12, %ah; " \
-//  "mov %ax, -12(%rsp); fldcw -12(%rsp); "
-//
-//#define FROM_F80_2 " -24(%rsp); fldcw -10(%rsp); "
-//
-//static char f80i8[] = FROM_F80_1 "fistps" FROM_F80_2 "movsbl -24(%rsp), %eax";
-//static char f80u8[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
-//static char f80i16[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
-//static char f80u16[] = FROM_F80_1 "fistpl" FROM_F80_2 "movswl -24(%rsp), %eax";
-//static char f80i32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
-//static char f80u32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
-//static char f80i64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
-//static char f80u64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
-//static char f80f32[] = "fstps -8(%rsp); movss -8(%rsp), %xmm0";
-//static char f80f64[] = "fstpl -8(%rsp); movsd -8(%rsp), %xmm0";
-//
-//static char *cast_table[][11] = {
-//  // i8   i16     i32     i64     u8     u16     u32     u64     f32     f64     f80
-//  {NULL,  NULL,   NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i8
-//  {i32i8, NULL,   NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i16
-//  {i32i8, i32i16, NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i32
-//  {i32i8, i32i16, NULL,   NULL,   i32u8, i32u16, NULL,   NULL,   i64f32, i64f64, i64f80}, // i64
-//
-//  {i32i8, NULL,   NULL,   i32i64, NULL,  NULL,   NULL,   i32i64, i32f32, i32f64, i32f80}, // u8
-//  {i32i8, i32i16, NULL,   i32i64, i32u8, NULL,   NULL,   i32i64, i32f32, i32f64, i32f80}, // u16
-//  {i32i8, i32i16, NULL,   u32i64, i32u8, i32u16, NULL,   u32i64, u32f32, u32f64, u32f80}, // u32
-//  {i32i8, i32i16, NULL,   NULL,   i32u8, i32u16, NULL,   NULL,   u64f32, u64f64, u64f80}, // u64
-//
-//  {f32i8, f32i16, f32i32, f32i64, f32u8, f32u16, f32u32, f32u64, NULL,   f32f64, f32f80}, // f32
-//  {f64i8, f64i16, f64i32, f64i64, f64u8, f64u16, f64u32, f64u64, f64f32, NULL,   f64f80}, // f64
-//  {f80i8, f80i16, f80i32, f80i64, f80u8, f80u16, f80u32, f80u64, f80f32, f80f64, NULL},   // f80
-//};
-bool typecheck_var(Var* var, Type* var_expr_type){  
-  if(!Type_cmp(var->type_field->type, var_expr_type)){
-    return false;
+enum { I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, F80 };
+int getTypeId(Type* ty){
+  switch (ty->kind) {
+  case TYPE_CHAR:
+  case TYPE_I64:
+    if(ty->size == 1){
+      return ty->is_unsigned ? U8 : I8;
+    }
+    else if(ty->size == 2){
+      return ty->is_unsigned ? U16 : I16;
+    }
+    else if (ty->size == 4){
+      return ty->is_unsigned ? U32 : I32;
+    }
+    else {
+      assert(ty->size == 8);
+      return ty->is_unsigned ? U64 : I64;
+    }
   }
-  return true;
+  return U64;
 }
-bool typecheck_param(Var* var, Type* var_expr_type){
-  if(!Type_cmp(var->type_field->type, var_expr_type)){
-    return false;
-  }
-  return true;
-}
-  
+// TODO: translate this to asm x86_64
+static char i32i8[] = "movsbl %al, %eax";
+static char i32u8[] = "movzbl %al, %eax";
+static char i32i16[] = "movswl %ax, %eax";
+static char i32u16[] = "movzwl %ax, %eax";
+static char i32f32[] = "cvtsi2ssl %eax, %xmm0";
+static char i32i64[] = "\tmovsxd rax, eax";
+static char i32f64[] = "cvtsi2sdl %eax, %xmm0";
+static char i32f80[] = "mov %eax, -4(%rsp); fildl -4(%rsp)";
 
-static int count(void) {
-  static int i = 1;
-  return i++;
-}
-#define println(...)				\
-  {						\
-    fprintf(output_file, __VA_ARGS__);		\
-    fprintf(output_file, "\n");			\
-  }
+static char u32f32[] = "mov %eax, %eax; cvtsi2ssq %rax, %xmm0";
+static char u32i64[] = "mov %eax, %eax";
+static char u32f64[] = "mov %eax, %eax; cvtsi2sdq %rax, %xmm0";
+static char u32f80[] = "mov %eax, %eax; mov %rax, -8(%rsp); fildll -8(%rsp)";
+
+static char i64f32[] = "cvtsi2ssq %rax, %xmm0";
+static char i64f64[] = "cvtsi2sdq %rax, %xmm0";
+static char i64f80[] = "movq %rax, -8(%rsp); fildll -8(%rsp)";
+
+static char u64f32[] = "cvtsi2ssq %rax, %xmm0";
+static char u64f64[] =
+  "test %rax,%rax; js 1f; pxor %xmm0,%xmm0; cvtsi2sd %rax,%xmm0; jmp 2f; "
+  "1: mov %rax,%rdi; and $1,%eax; pxor %xmm0,%xmm0; shr %rdi; "
+  "or %rax,%rdi; cvtsi2sd %rdi,%xmm0; addsd %xmm0,%xmm0; 2:";
+static char u64f80[] =
+  "mov %rax, -8(%rsp); fildq -8(%rsp); test %rax, %rax; jns 1f;"
+  "mov $1602224128, %eax; mov %eax, -4(%rsp); fadds -4(%rsp); 1:";
+
+static char f32i8[] = "cvttss2sil %xmm0, %eax; movsbl %al, %eax";
+static char f32u8[] = "cvttss2sil %xmm0, %eax; movzbl %al, %eax";
+static char f32i16[] = "cvttss2sil %xmm0, %eax; movswl %ax, %eax";
+static char f32u16[] = "cvttss2sil %xmm0, %eax; movzwl %ax, %eax";
+static char f32i32[] = "cvttss2sil %xmm0, %eax";
+static char f32u32[] = "cvttss2siq %xmm0, %rax";
+static char f32i64[] = "cvttss2siq %xmm0, %rax";
+static char f32u64[] = "cvttss2siq %xmm0, %rax";
+static char f32f64[] = "cvtss2sd %xmm0, %xmm0";
+static char f32f80[] = "movss %xmm0, -4(%rsp); flds -4(%rsp)";
+
+static char f64i8[] = "cvttsd2sil %xmm0, %eax; movsbl %al, %eax";
+static char f64u8[] = "cvttsd2sil %xmm0, %eax; movzbl %al, %eax";
+static char f64i16[] = "cvttsd2sil %xmm0, %eax; movswl %ax, %eax";
+static char f64u16[] = "cvttsd2sil %xmm0, %eax; movzwl %ax, %eax";
+static char f64i32[] = "cvttsd2sil %xmm0, %eax";
+static char f64u32[] = "cvttsd2siq %xmm0, %rax";
+static char f64i64[] = "cvttsd2siq %xmm0, %rax";
+static char f64u64[] = "cvttsd2siq %xmm0, %rax";
+static char f64f32[] = "cvtsd2ss %xmm0, %xmm0";
+static char f64f80[] = "movsd %xmm0, -8(%rsp); fldl -8(%rsp)";
+
+#define FROM_F80_1                                           \
+  "fnstcw -10(%rsp); movzwl -10(%rsp), %eax; or $12, %ah; " \
+  "mov %ax, -12(%rsp); fldcw -12(%rsp); "
+
+#define FROM_F80_2 " -24(%rsp); fldcw -10(%rsp); "
+
+static char f80i8[] = FROM_F80_1 "fistps" FROM_F80_2 "movsbl -24(%rsp), %eax";
+static char f80u8[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
+static char f80i16[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
+static char f80u16[] = FROM_F80_1 "fistpl" FROM_F80_2 "movswl -24(%rsp), %eax";
+static char f80i32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
+static char f80u32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
+static char f80i64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
+static char f80u64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
+static char f80f32[] = "fstps -8(%rsp); movss -8(%rsp), %xmm0";
+static char f80f64[] = "fstpl -8(%rsp); movsd -8(%rsp), %xmm0";
+
+static char *cast_table[][11] = {
+  // i8   i16     i32     i64     u8     u16     u32     u64     f32     f64     f80
+  {NULL,  NULL,   NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i8
+  {i32i8, NULL,   NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i16
+  {i32i8, i32i16, NULL,   i32i64, i32u8, i32u16, NULL,   i32i64, i32f32, i32f64, i32f80}, // i32
+  {i32i8, i32i16, NULL,   NULL,   i32u8, i32u16, NULL,   NULL,   i64f32, i64f64, i64f80}, // i64
+
+  {i32i8, NULL,   NULL,   i32i64, NULL,  NULL,   NULL,   i32i64, i32f32, i32f64, i32f80}, // u8
+  {i32i8, i32i16, NULL,   i32i64, i32u8, NULL,   NULL,   i32i64, i32f32, i32f64, i32f80}, // u16
+  {i32i8, i32i16, NULL,   u32i64, i32u8, i32u16, NULL,   u32i64, u32f32, u32f64, u32f80}, // u32
+  {i32i8, i32i16, NULL,   NULL,   i32u8, i32u16, NULL,   NULL,   u64f32, u64f64, u64f80}, // u64
+
+  {f32i8, f32i16, f32i32, f32i64, f32u8, f32u16, f32u32, f32u64, NULL,   f32f64, f32f80}, // f32
+  {f64i8, f64i16, f64i32, f64i64, f64u8, f64u16, f64u32, f64u64, f64f32, NULL,   f64f80}, // f64
+  {f80i8, f80i16, f80i32, f80i64, f80u8, f80u16, f80u32, f80u64, f80f32, f80f64, NULL},   // f80
+};
+
 static void push(void){
   println("\tpush rax");
   depth++;
@@ -228,31 +151,35 @@ static const char *reg_ax(int sz) {
 static Type* load(Type* ty){
   
   switch(ty->kind){
-  case TYPE_I64: {
-    const char* inst = ty->is_unsigned? "movz" : "movs";
-    // TODO: sz 1 and 2
-    if(ty->size == 1){
-      println("\t%sx rax, %s [rax]", inst,
-	      word_from_size(ty->size));      
-    } else if (ty->size == 2){
-      println("\t%sx rax, %s [rax]", inst,
-	      word_from_size(ty->size));
-    }
-    else if (ty->size == 4){
-      println("\tmovsxd rax, %s [rax]",
-	      word_from_size(ty->size));
-    }
-    else {
-      println("\tmov rax, [rax]");
-    }
-  } break;
+  case TYPE_ANY:  // size == 8
+  case TYPE_CHAR: // size == 1
+  case TYPE_I64: //  size == 1 to 8
+    {
+      const char* inst = ty->is_unsigned? "movz" : "movs";
+      // TODO: sz 1 and 2
+
+      if(ty->size == 1){
+	println("\t%sx rax, %s [rax]", inst,
+		word_from_size(ty->size));      
+      } else if (ty->size == 2){
+	println("\t%sx rax, %s [rax]", inst,
+		word_from_size(ty->size));
+      }
+      else if (ty->size == 4){
+	println("\tmovsxd rax, %s [rax]",
+		word_from_size(ty->size));
+      }
+      else {
+	assert(ty->size == 8);
+	println("\tmov rax, %s [rax]",
+		word_from_size(ty->size));
+      }
+    } break;
   case TYPE_PTR:
     println("\tmov rax, %s [rax]",
 	    word_from_size(ty->size));
     return ty->ptr.base;
-  case TYPE_CHAR:
-    println("\tmovzx eax, BYTE [eax]");
-    break;
+
   case TYPE_ARRAY: break;
   default:
     unreachable();
@@ -269,6 +196,7 @@ static void store(Type* ty){
   case TYPE_I64:
   case TYPE_ARRAY:
   case TYPE_CHAR:
+  case TYPE_ANY:
     // TODO
     if (ty->size == 1){
       println("\tmov %s [rdi], al", word_from_size(ty->size));
@@ -284,9 +212,7 @@ static void store(Type* ty){
     unreachable();
   }    
 }
-static Var* Expr_get_var(Expr* expr){
-  unreachable();
-}
+
 static int push_callargs(Proc* proc, Expr** args){
   int stack=0;
 
@@ -296,7 +222,7 @@ static int push_callargs(Proc* proc, Expr** args){
 	Var* vparam = proc->args->vars[i];
 	assert(vparam);
 	Type* texpr = gen_expr(args[j]);
-	if(!typecheck_param(vparam, texpr)){
+	if(!Type_cmp(texpr, vparam->type_field->type)){
 	  fprintf(stderr,
 		  "ERROR: can not call the procedure %s, because the %zu-nth arguemnt does not match the call.\n",
 		  proc->name,
@@ -310,7 +236,7 @@ static int push_callargs(Proc* proc, Expr** args){
     }
     Var* vparam = proc->args->vars[i];    
     Type* texpr = gen_expr(args[i]);
-    if(!typecheck_param(vparam, texpr)){
+    if(!Type_cmp(texpr, vparam->type_field->type)){
       fprintf(stderr,
 	      "ERROR: can not call the procedure %s, because the %zu-nth arguemnt does not match the call.\n",
 	      proc->name,
@@ -326,7 +252,8 @@ static void gen_addr(Var* var){
   TypeField* tf = var->type_field;
   switch(tf->type->kind){
   case TYPE_PTR:
-  case TYPE_I64:    
+  case TYPE_I64:
+  case TYPE_ANY:
     println("\tlea rax, %s [rbp - %i]",
 	    word_from_size(tf->type->size),
 	    (int)var->offset);
@@ -360,6 +287,7 @@ static void store_callargs(ProcArgs* pa){
     Type* ty = arg->type_field->type;
     switch(ty->kind){
     case TYPE_PTR:
+    case TYPE_ANY:
     case TYPE_I64:
       // TODO
       if (ty->size == 1){
@@ -495,6 +423,7 @@ static void gen_expr_cmp(Expr* expr){
   // rbx = rhs
 
   println("\tcmp rax, rbx");
+  printf("OK\n");
   switch(op){
   case LT:
     println("\tjge .L.CMP.UNMATCH.%i", cmp_count);
@@ -524,6 +453,26 @@ static void gen_expr_cmp(Expr* expr){
   println("\tmov rax, 0");
   println(".L.CMP.END%i:", cmp_count);
   cmp_count++;
+}
+
+static Type* gen_cast(Cast* cast){
+  Type* from = gen_expr(cast->expr);
+  TypeKind tok = cast->type->type->kind;
+  if(tok == TYPE_NONE){
+    return Type_none();
+  }
+  if(tok == TYPE_BOOL){
+    cmp_zero(from);
+    println("\tsetne al");
+    println("\tmovzx eax, al");
+    return Type_int();
+  }
+  int t1 = getTypeId(from);
+  int t2 = getTypeId(cast->type->type);
+  if(cast_table[t1][t2]){
+    println("%s", cast_table[t1][t2]);
+  }
+  return cast->type->type;
 }
 
 static Type* gen_expr(Expr* expr){
@@ -641,7 +590,7 @@ static Type* gen_expr(Expr* expr){
     load_vars = false;
     Type* type = gen_expr(expr->as.addr_of);
     load_vars = true;
-    return type;
+    return Type_ptr(type);
   } break;
   case EXPRKIND_REASIGN: {    
     load_vars = false;
@@ -651,9 +600,32 @@ static Type* gen_expr(Expr* expr){
     Type* tvar = gen_expr(expr->as.Reasign.from);
     load_vars = true;
     push();
+    // Generate the body inside register rax
     Type* texpr = gen_expr(expr->as.Reasign.to);
-    // TODO: automatic cast
-    if (!Type_cmp(tvar, texpr)){
+	
+    if(expr->as.Reasign.token.kind == TOKEN_EQPLUS){
+      // from = to
+      gen_expr(expr->as.Reasign.to);
+      push();
+      gen_expr(expr->as.Reasign.from);
+      
+      pop("rbx");
+      println("\tadd rax, rbx");
+    }
+    if(expr->as.Reasign.token.kind == TOKEN_EQLESS){
+      // from = to
+      gen_expr(expr->as.Reasign.to);
+      push();
+      gen_expr(expr->as.Reasign.from);
+      //push();
+      pop("rbx");
+      println("\tsub rax, rbx");
+    }
+    
+    else {
+      assert(expr->as.Reasign.token.kind == TOKEN_EQ);
+    }
+    if (!Type_cmp(texpr, tvar)){
       fprintf(stderr,
     	      "ERROR: can not re-asign the var '%s' from type '%s' to an type '%s'.\n",
 	      current_reasign_var,
@@ -663,10 +635,25 @@ static Type* gen_expr(Expr* expr){
     }
     store(tvar);
     DEBUG_OK;
-    return tvar;
+    return Type_none();
   } break;
   case EXPR_BINARY_OP: {
 #define bin(op, reg_a, reg_b) println("\t%s %s, %s", op, reg_a, reg_b)
+    if(   expr->as.BinaryOp.op ==  OP_KIND_OR
+       || expr->as.BinaryOp.op ==  OP_KIND_AND)
+      {
+    
+	gen_expr(expr->as.BinaryOp.rhs);
+	push();
+	gen_expr(expr->as.BinaryOp.lhs);
+	pop("rbx");
+    	println("\t%s rax, rbx",
+    		expr->as.BinaryOp.op == OP_KIND_OR
+		? "or"
+		: "and");
+    	return Type_int();
+      }
+    
     const char* op;
     // NOTE: e_d stands for expression depth
     static size_t e_d = 0;
@@ -675,39 +662,6 @@ static Type* gen_expr(Expr* expr){
     push();
     gen_expr(expr->as.BinaryOp.lhs);
     e_d -= 2;
-    switch(expr->as.BinaryOp.op){
-    case OP_KIND_PLUS:
-      op = "add";
-      break;
-    case OP_KIND_MINUS:
-      op = "sub";
-      break;
-    case OP_KIND_DIV:
-
-      if(e_d == 0){
-	pop("rbx");
-      }
-      else {
-	pop("rax");
-	pop("rbx");	
-      }
-      println("\tdiv rbx");	
-      return Type_int();
-    case OP_KIND_MULT:
-      if(e_d == 0){
-	pop("rbx");
-	println("\tmul rbx");
-      }
-      else {
-	pop("rax");
-	pop("rbx");
-	println("\tmul rbx");
-      }
-      return Type_int();
-    default:
-      unreachable();
-    }        
-    // TODO: optimize this section
     if(e_d == 0){
       pop("rbx");
     }
@@ -716,13 +670,44 @@ static Type* gen_expr(Expr* expr){
       pop("rbx");
       pop("rax");
     }
-    bin(op, "rax", "rbx");
+    // rax == lhs
+    // rbx == rhs
+    switch(expr->as.BinaryOp.op){
+    case OP_KIND_PLUS:
+      println("\tadd rax, rbx");
+      return Type_int();
+      
+    case OP_KIND_MINUS:      
+      println("\tsub rax, rbx");
+      return Type_int();
+      
+    case OP_KIND_DIV:
+      println("\tdiv rbx");	
+      return Type_int();
+      
+    case OP_KIND_MULT:
+      println("\tmul rbx");      
+      return Type_int();
+      
+    case OP_KIND_SHR:
+      println("\tmov rcx, rbx");
+      println("\tshr rax, cl");
+      return Type_int();
+      
+    case OP_KIND_SHL:
+      println("\tmov rcx, rbx");
+      println("\tshl rax, cl");
+      return Type_int();      
+    }
+
+    unreachable();
+    // TODO: optimize this section
+
 #undef bin
   } return Type_int();
     
-  case EXPRKIND_CAST:
-    gen_expr(expr->as.Cast.expr);
-    return expr->as.Cast.type->type;
+  case EXPRKIND_CAST:       
+    return gen_cast(&expr->as.cast);
   case EXPR_COMPARASION: 
     gen_expr_cmp(expr);
     return Type_int();
@@ -744,7 +729,24 @@ static Type* gen_expr(Expr* expr){
     gen_expr(expr->as.expr);
     println("\tnot rax");
   } return Type_int();
-    
+  case EXPRKIND_ARRAY_ACCESS:{
+    Var* arr = Var_get(&local_vars, expr->as.ArrayAccess.name);
+    assert(arr);
+    //
+    gen_addr(arr);
+    load(arr->type_field->type->ptr.base);
+    push();
+    Type* ty = gen_expr(expr->as.ArrayAccess.expr);
+    println("\tmov rax, rbx");
+    assert(ty->kind == TYPE_I64);
+
+    pop("rax");
+    println("\tadd rax, rbx", 12 + (expr->as.INT * 4));
+      
+
+    //println("\tmov rax rdi");
+    return arr->type_field->type->ptr.base;
+  } break;
   default:
     print_expr(expr);
     unreachable();
@@ -798,6 +800,7 @@ static void gen_stmt(Stmt* stmt){
     println(".L.else.end.%i:", end_lb);
   } break;
   case STMTKIND_RETURN: {
+    assert(current_decl);
     if(current_decl->as.procDecl.ret_type->kind == TYPE_NONE){
       fprintf(stderr,
 	      "ERROR: return only works in non-void procedures.\n");
@@ -816,8 +819,7 @@ static void gen_stmt(Stmt* stmt){
 	      current_decl->as.procDecl.name,
 	      typekind_cstr(got_type));
       exit(1);
-    }
-    assert(current_decl);
+    }    
     println("\tjmp .L.return.%s", current_decl->as.procDecl.name);
   } break;
   case STMTKIND_LOCAL_VAR: {
@@ -828,7 +830,7 @@ static void gen_stmt(Stmt* stmt){
       gen_addr(lv);
       push();
       Type* texpr = gen_expr(lv->expr);                 
-      if(!typecheck_var(lv, texpr)){
+      if(!Type_cmp(lv->type_field->type, texpr)){
 	  fprintf(stderr,
 		  "ERROR: can not asign the local variable %s of type %s to an type %s.\n",
 		  lv->type_field->name,
@@ -910,15 +912,6 @@ static void gen_proc_prologue(Decl* procDecl){
   println("\tglobal %s", procDecl->as.procDecl.name);
   println("\tsection .text");
   println("%s:", procDecl->as.procDecl.name);
-  if(STR_CMP(procDecl->as.procDecl.name, "main")){
-    Proc pmain = procDecl->as.procDecl;
-    if(pmain.args->vars_size > 0){
-      Var* argc = Var_get(&local_vars, pmain.args->vars[0]->type_field->name);
-      Var* argv = Var_get(&local_vars, pmain.args->vars[1]->type_field->name);
-      printf("TODO: argc|argv\n");
-      exit(1);
-    }
-  }
   println("\tpush rbp");      
   println("\tmov  rbp, rsp");
   int alloc = align_to((int)procDecl->as.procDecl.stack_allocation, 8);
@@ -944,7 +937,8 @@ void AssemblerPROC(Decl* decl){
   println("\tret");
   
 }
-void AssemblyNode(Decl* decl){
+
+void decl_asm(Decl* decl){
 
   switch(decl->kind){
   case DECL_PROC:
@@ -966,14 +960,14 @@ void AssemblyNode(Decl* decl){
       Decl* ns = decl->as.Namespace.decls[i];      
       strcat((char*)ns->name, "_");
       strcat((char*)ns->name, ns_name);
-      AssemblyNode(ns);
+      decl_asm(ns);
     }
     break;
   case DECL_IMPORT: 
     for(size_t i=0; i < buf__len(decl->as.Import.ast); ++i){
       if(decl->as.Import.ast[i]->kind != DECL_IMPORT)
 	println("\t;; file %s", decl->as.Import.path);
-      AssemblyNode(decl->as.Import.ast[i]);
+      decl_asm(decl->as.Import.ast[i]);
     }
     break;
   case DECL_ENUM: {
@@ -998,7 +992,7 @@ void AssemblyNode(Decl* decl){
   DEBUG_OK;
   
 }
-void AssemblerAST(Decl** ast, const char* output_fp){
+void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
   output_file = fopen(output_fp, "wb");
   assert(output_file);
   println("\tglobal _start");
@@ -1058,11 +1052,11 @@ void AssemblerAST(Decl** ast, const char* output_fp){
   println("\tleave");
   println("\tret");
   for(size_t i=0; i < buf__len(namespaces); ++i){
-    AssemblyNode(namespaces[i]);
+    decl_asm(namespaces[i]);
   }
 
   for(size_t j=0; j < buf__len(ast); ++j){
-    AssemblyNode(ast[j]);
+    decl_asm(ast[j]);
     
   }
 
@@ -1072,7 +1066,7 @@ void AssemblerAST(Decl** ast, const char* output_fp){
     Var* global_var = global_vars[i];
     if(global_var->expr){
       Type* texpr = gen_expr(global_var->expr);
-      if(!typecheck_var(global_var, texpr)){
+      if(!Type_cmp(global_var->type_field->type, texpr)){
 	fprintf(stderr,
 		"ERROR: can not asign the global variable %s of type %s to an type %s.\n",
 	        global_var->type_field->name,
@@ -1083,9 +1077,14 @@ void AssemblerAST(Decl** ast, const char* output_fp){
       
     
       println("\tmov rdi, %s", global_var->type_field->name);
-      println("\tmov [rdi], rax");
+      println("\tmov [rdi], rax");      
     }
   }
+  println("\tmov rdi, [rsp]");
+  println("\tmov rsi, [rsp + 8]");
+  println("\tmov rbp, rsp");
+  //argc == rdi
+  //argv == rsi
   println("\tcall main");
   println("\tmov rdi, rax");
   println("\tmov rax, 60");
@@ -1113,4 +1112,4 @@ void AssemblerAST(Decl** ast, const char* output_fp){
   fclose(output_file);  
 }
 
-#endif /* __assembler */
+#endif /*__asmx86_64_compiler */

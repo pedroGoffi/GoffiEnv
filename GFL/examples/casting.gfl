@@ -1,0 +1,8 @@
+
+proc main(): void {
+  var x: ui8 = 69;
+  __print__(
+    x,
+    x as i64
+  );
+}

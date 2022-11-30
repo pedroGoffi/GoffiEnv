@@ -1,0 +1,25 @@
+#import "std/std.gfl"
+
+proc main(): void {
+  var x1: i64 = true;
+  var x2: i64 = false;
+
+  if x1 and x2 {
+    puts("x1 and x2\n");    
+  }
+  if x1 or x2 {
+    puts("x1 or x2\n");
+  }
+  // NOTE:
+  //  x1 = true
+  //  x2 = false
+  var x3: i64 = x1 if (x1 and x2) else x2;
+  //  true and false = false
+  //  then else, x3 = x2, x2 is false then x3 is 0
+  __print__(x3); // 0
+  x3          = x1 if (x1 or  x2) else x2;
+  //  true or false = true
+  //  then x3 = x1, x1 is true then x3 is 1
+  __print__(x3); // 1
+  
+}

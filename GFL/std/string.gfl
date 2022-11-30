@@ -52,7 +52,7 @@ MAX_W_SIZE :: 256
 proc input(msg: *char=""): *char{
   puts(msg);
   // TODO: make arrays for god sake
-  var res: *char = INIT_MAX_STR;
+  var res: *char  = INIT_MAX_STR;
   // 258 bytes lol
   var len: i64 = MAX_W_SIZE;
   SYSCALL3(stdin, res, len, SYS_read);
@@ -86,10 +86,10 @@ proc stoi(str: *char): i64{
   return result; 
 }
 proc strcat(a: *char, b:*char): *char {
-  var res:  *char  = INIT_MAX_STR;
-  var iter: *char = res;
-  var asz: i64 = strlen(a);
-  var bsz: i64 = strlen(b);
+  var res:  *char	= INIT_MAX_STR;
+  var iter: *char	= res;
+  var asz:  i64		= strlen(a);
+  var bsz:  i64		= strlen(b);
   
   while 0 < asz {
     *iter = *a;

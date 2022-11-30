@@ -1,0 +1,33 @@
+#import "std/std.gfl"
+
+proc some(): i64{}
+
+
+proc main(): void{
+  var i: i64 = 11;
+  
+  while 0 < i {    
+    __print__(i);
+    i -= 1;   
+  }
+  
+  if i != 0 {
+    puts("ERROR: expected i == 0, but got: ");
+    __print__(i);
+    exit(1);    
+  }
+  elif i == 0 {
+    puts("OK\n");
+  }
+  
+  var x: i64;
+  var prev: i64;
+  while true {
+    x    = 0 if prev == 0 else 1;
+    prev = 1 if x    == 0 else 0;
+    
+    __print__(x);
+    if x  == 2 - 1 { break; }
+  }  
+  
+}

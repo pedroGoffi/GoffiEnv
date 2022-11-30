@@ -34,6 +34,12 @@ typedef enum TokenKind{
   TOKEN_LAST_CHAR	= 127,
   // COMPLEX TOKENS, NOTE: a complex token need more than one char to define
   TOKEN_DLESS,
+  TOKEN_EQLESS,
+  TOKEN_SHR,
+  TOKEN_SHL,
+  TOKEN_EQPLUS,
+  TOKEN_LESSEQ,
+  TOKEN_GREATEREQ,
   TOKEN_DPLUS,
   TOKEN_CMP_EQ,
   TOKEN_CMP_NEQ,
@@ -103,9 +109,16 @@ const char *human_readable_token(TokenKind kind){
   case TokenKind::TOKEN_DOUBLE_DOT:	return ":";
   case TokenKind::TOKEN_DOT_AND_COMMA:	return ";";
   case TokenKind::TOKEN_LESS:		return "<";
-  case TokenKind::TOKEN_EQ:		return "=";
-  case TokenKind::TOKEN_CMP_EQ:         return "==";
+  case TokenKind::TOKEN_SHL:		return "<<";
+  case TokenKind::TOKEN_LESSEQ:		return "<=";
   case TokenKind::TOKEN_GREATER:	return ">";
+  case TokenKind::TOKEN_SHR:		return ">>";
+  case TokenKind::TOKEN_GREATEREQ:      return ">=";
+    
+  case TokenKind::TOKEN_EQ:		return "=";
+  case TokenKind::TOKEN_EQLESS:         return "-=";
+  case TokenKind::TOKEN_EQPLUS:         return "+=";
+  case TokenKind::TOKEN_CMP_EQ:         return "==";
   case TokenKind::TOKEN_QUESTION_MARK:	return "?";
   case TokenKind::TOKEN_DLESS:		return "--";
   case TokenKind::TOKEN_DPLUS:		return "++";

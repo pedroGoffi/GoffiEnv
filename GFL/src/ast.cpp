@@ -42,6 +42,7 @@ typedef enum ExprKind{
   EXPRKIND_NONE,
   EXPR_BINARY_OP,
   EXPR_COMPARASION,
+  EXPRKIND_LOGIC,
   EXPRKIND_NEG,
   EXPRKIND_INT,
   EXPRKIND_FLOAT,
@@ -58,10 +59,15 @@ typedef enum ExprKind{
   EXPRKIND_NAMESPACE_GET,
 } ExprKind;
 typedef enum EXPR_BINARY_OP_KIND{
-  OP_KIND_PLUS,
+  OP_KIND_PLUS = 100,
   OP_KIND_MINUS,
   OP_KIND_DIV,
-  OP_KIND_MULT
+  OP_KIND_MULT,
+  OP_KIND_SHR,
+  OP_KIND_SHL,
+  OP_KIND_OR,
+  OP_KIND_AND
+  
 } EXPR_BINARY_OP_KIND;
 
 const char* human_expr_binary_op_kind(EXPR_BINARY_OP_KIND kind){
@@ -101,9 +107,7 @@ const char* human_expr_cmp_kind(EXPR_CMP_KIND kind){
 }
 typedef enum TypeKind{
   TYPE_NONE,
-  // TODO: TYPE_I8,
-  // TODO: TYPE_I16,  
-  TYPE_I32,
+  TYPE_ANY,
   TYPE_I64,
   TYPE_BOOL,
   TYPE_F64,
@@ -145,6 +149,16 @@ struct Call{
   Expr** args;
   size_t args_size;
 };
+enum LogicKind{LK_OR, LK_AND};
+struct Logic{
+  LogicKind kind;
+  Expr* lhs;
+  Expr* rhs;
+};
+struct Cast{
+  TypeField* type;
+  Expr* expr;     
+} ;
 struct Expr{
   ExprKind    kind;
   const char* name;
@@ -168,13 +182,12 @@ struct Expr{
       Expr* lhs;
       Expr* rhs;
     } comparasion;
-    struct{
-      TypeField* type;
-      Expr* expr;     
-    } Cast;
+    
     Call call;
+    Cast cast;
 
     struct{
+      Token token;
       Expr* from;
       Expr* to;
     } Reasign;
@@ -186,17 +199,26 @@ struct Expr{
     } FieldAccess;
     struct{
       const char* name;
-      Expr* expr;
+      Expr*       expr;
     } ArrayAccess;
     struct {
       const char* name;
       Expr*       rhs;
     } NamespaceGet;
+    Logic logic;
     Expr* expr;
     Expr* derref;
     Expr* addr_of;
   } as;  
 };
+Expr* make_expr_logic(EXPR_BINARY_OP_KIND kind, Expr* lhs, Expr* rhs){
+  Expr* r = new Expr;
+  r->kind = EXPR_BINARY_OP;
+  r->as.BinaryOp.op   = kind;
+  r->as.BinaryOp.lhs  = lhs;
+  r->as.BinaryOp.rhs  = rhs;
+  return r;
+}
 const char* get_name_of_reasign(Expr* e){  
   if(e->kind == EXPRKIND_NAME){
     return e->name;
@@ -302,7 +324,7 @@ TypeFieldKind TypeFieldKind_by_cstr(const char* type){
   if(STR_CMP(type, str)){			\
     return ret_type;				\
   }
-  DOIF_TYPE("i32",  TYPE_I32);
+  DOIF_TYPE("any",  TYPE_ANY);
   DOIF_TYPE("i64",  TYPE_I64);
   
   DOIF_TYPE("f64",  TYPE_F64);
@@ -317,7 +339,11 @@ const char* typekind_cstr(Type* t){
   switch(kind){
   case TypeKind::TYPE_NONE: return "void";
   case TypeKind::TYPE_I64:  return "i64";
+  case TypeKind::TYPE_F64:  return "f64";
+    
+  case TypeKind::TYPE_ANY:  return "any";
   case TypeKind::TYPE_CHAR: return "char";
+    
   case TypeKind::TYPE_PTR:  {
     assert(t->ptr.base);
     char* base = NULL;
@@ -328,7 +354,7 @@ const char* typekind_cstr(Type* t){
     }    
     return base;
   }
-  case TypeKind::TYPE_F64:   
+ 
   case TypeKind::TYPE_ARRAY:
   case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
@@ -376,9 +402,11 @@ Type* Type_ptr_copy(Type* ptr){
 int sizeof_type(Type* type){
   switch(type->kind){
   
-  case TypeKind::TYPE_BOOL: 
-    return 1;
+  case TypeKind::TYPE_BOOL:
   case TypeKind::TYPE_CHAR:
+      
+    return 1;    
+  case TypeKind::TYPE_ANY:
   case TypeKind::TYPE_I64:  
   case TypeKind::TYPE_PTR:  return 8;
     
@@ -401,11 +429,12 @@ int sizeof_type(Type* type){
   return 0;
 }
 
-bool Type_cmp(Type* a, Type* b){
-  if(a->kind == TYPE_PTR and b->kind == TYPE_PTR){
-    return Type_cmp(a->ptr.base, b->ptr.base);
+bool Type_cmp(Type* got, Type* expected){
+  if(got->kind == TYPE_PTR and expected->kind == TYPE_PTR){
+    return Type_cmp(got->ptr.base, expected->ptr.base);
   }
-  return a->kind == b->kind;
+  if(expected->kind == TYPE_ANY) return true;
+  return got->kind == expected->kind;
 }
 Type* derref_type(Type* type){
   switch(type->kind){
@@ -647,13 +676,19 @@ EXPR_BINARY_OP_KIND make_expr_binary_op_kind(){
   if(is_token(TOKEN_TAKEAWAY))	return EXPR_BINARY_OP_KIND::OP_KIND_MINUS;
   if(is_token(TOKEN_DIV))	return EXPR_BINARY_OP_KIND::OP_KIND_DIV;
   if(is_token(TOKEN_STAR))	return EXPR_BINARY_OP_KIND::OP_KIND_MULT;
-  
+  if(is_token(TOKEN_SHR))	return EXPR_BINARY_OP_KIND::OP_KIND_SHR;
+  if(is_token(TOKEN_SHL))	return EXPR_BINARY_OP_KIND::OP_KIND_SHL;
+    
   printf("ERROR: undefined binary operation symbol.\n");
   exit(1);
 }
 EXPR_CMP_KIND make_cmp_kind(){
-  if(is_token(TOKEN_LESS)) return EXPR_CMP_KIND::LT;
-  if(is_token(TOKEN_CMP_EQ))   return EXPR_CMP_KIND::EQ;
+  if(is_token(TOKEN_LESS))	return EXPR_CMP_KIND::LT;
+  if(is_token(TOKEN_LESSEQ))	return EXPR_CMP_KIND::LTE;
+  if(is_token(TOKEN_GREATER))	return EXPR_CMP_KIND::GT;
+  if(is_token(TOKEN_GREATEREQ)) return EXPR_CMP_KIND::GTE; 
+  if(is_token(TOKEN_CMP_EQ))	return EXPR_CMP_KIND::EQ;
+  if(is_token(TOKEN_CMP_NEQ))   return EXPR_CMP_KIND::NEQ;
   printf("ERROR: undefined binary comparasion operation symbol.\n");
   exit(1);
 }
@@ -674,10 +709,11 @@ Expr* expr_int(int val){
     }
   };
 }
-Expr* expr_reasign(Expr* from, Expr* to){
+Expr* expr_reasign(Token token, Expr* from, Expr* to){
   Expr* rs = new Expr;
-  rs->as.Reasign.from = from;
-  rs->as.Reasign.to   = to;
+  rs->as.Reasign.token = token;
+  rs->as.Reasign.from  = from;
+  rs->as.Reasign.to    = to;
   rs->kind = EXPRKIND_REASIGN;
   return rs;
 }
@@ -709,9 +745,9 @@ void print_expr(Expr* e){
     break;
   case EXPRKIND_CAST:
     printf("(cast [");
-    print_type(e->as.Cast.type->type);
+    print_type(e->as.cast.type->type);
     printf("]::[");
-    print_expr(e->as.Cast.expr);
+    print_expr(e->as.cast.expr);
     printf("])");    
     break;
   case EXPRKIND_NAME:
@@ -759,6 +795,9 @@ void print_expr(Expr* e){
     
     break;
   case EXPRKIND_ARRAY_ACCESS:
+    printf("Array access\n");
+    break;
+
   case EXPRKIND_FIELD_ACCESS:
   case EXPRKIND_NONE:
   default:
@@ -788,8 +827,8 @@ void print_type(Type* t){
   case TYPE_NONE:
     printf("none");
     break;
-  case TYPE_I32:
-    printf("i32");
+  case TYPE_ANY:
+    printf("any");
     break;
   case TYPE_I64:
     printf("i64");

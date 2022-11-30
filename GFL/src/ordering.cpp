@@ -158,7 +158,7 @@ void order_decl_proc(Decl* decl){
 		"ERROR: the 'main' procedure only supports 2 or 0 arguments.\n");
 	exit(1);
       }
-      if(args->vars[1]->type_field->type->kind != TYPE_I64){
+      if(args->vars[0]->type_field->type->kind != TYPE_I64){
 	fprintf(stderr,
 		"ERROR: the first argument on the 'main' procedure must be an i64.\n");
 	exit(1);	
@@ -202,8 +202,8 @@ ResolvedExpr* order_expr(Expr* e){
   } break;
   case EXPRKIND_CAST: {
     // TODO: order typespec
-    type = e->as.Cast.type->type;
-    ResolvedExpr* re = order_expr(e->as.Cast.expr);
+    type = e->as.cast.type->type;
+    ResolvedExpr* re = order_expr(e->as.cast.expr);
     if(re->type->kind == type->kind){
       printf("ERROR: Casting to the same expression type.\n");
       exit(1);

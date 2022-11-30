@@ -13,7 +13,7 @@
 #include "./ordering.cpp"
 AST_ROOT parser_run_code(const char* src);
 Decl** parse_file(FILE* f);
-Expr* parse_plus_minus();
+Expr* parse_binary();
 Expr* parse_e0();
 Expr* parse_unary();
 Expr* parse_mult();
@@ -84,9 +84,9 @@ Expr *parse_e0(){
       TypeField* casting_to = new TypeField;
       casting_to->type = parse_type();
       e->kind = EXPRKIND_CAST;
-      e->as.Cast.type = casting_to;
+      e->as.cast.type = casting_to;
       MustExpect(TOKEN_CLOSE_R_PAREN);
-      e->as.Cast.expr = parse_expr();
+      e->as.cast.expr = parse_expr();
       return e;
     }
     else{
@@ -176,7 +176,7 @@ Expr* parse_unary(){
   }
   else if(expect_token(TOKEN_BANG)){
     e->kind = EXPRKIND_NEG;
-    e->as.expr = parse_e0();    
+    e->as.expr = parse_unary();    
   }
   else if(expect_token(TOKEN_STAR)){
     e->kind		= EXPRKIND_DERREF_NAME;
@@ -203,41 +203,79 @@ Expr* parse_mult(){
   }
   return elhs;
 }
-
+inline bool is_token_logic(){
+  return token_is_name("or")
+    || token_is_name("and")
+    ;
+    
+}
 Expr* parse_logic(){
+  Expr* lhs = new Expr;
+  lhs = parse_mult();
+  while(is_token_logic()){
+    Expr* rhs = new Expr;
+    EXPR_BINARY_OP_KIND kind = STR_CMP(consume().name, "and")
+      ? OP_KIND_AND
+      : OP_KIND_OR;
+    rhs = parse_mult();
+    lhs = make_expr_logic(kind, lhs, rhs);
+  }
+  return lhs;
+}
+inline bool is_token_asign(){
+  return is_token(TOKEN_EQ)
+    || is_token(TOKEN_EQLESS)
+    || is_token(TOKEN_EQPLUS)
+    ;
+}
+Expr* parse_reasign(){
   Expr* e = new Expr;
-  e = parse_mult();
-  if(expect_token(TOKEN_EQ)){
-    e = expr_reasign(e, parse_expr());
+  e = parse_logic();
+  if(is_token_asign()){
+    Token tk = consume();
+    e = expr_reasign(tk, e, parse_expr());
   }
   return e;
 }
-Expr* parse_plus_minus(){
+inline bool is_token_binary(){
+  return is_token(TOKEN_PLUS)
+    || is_token(TOKEN_TAKEAWAY)
+    || is_token(TOKEN_SHL)
+    || is_token(TOKEN_SHR)
+    ;
+}
+Expr* parse_binary(){
   Expr* elhs = new Expr;
-  elhs = parse_logic();
-  while(is_token(TOKEN_PLUS) || is_token(TOKEN_TAKEAWAY)){
+  elhs = parse_reasign();
+  while(is_token_binary()){
     EXPR_BINARY_OP_KIND op = make_expr_binary_op_kind();
     next_token();
     Expr* erhs = new Expr;
-    erhs = parse_logic();
+    erhs = parse_reasign();
     elhs = expr_make_binary(elhs, erhs, op);
   }
   return elhs;
 }
 
+inline bool is_token_cmp(){
+  return is_token(TOKEN_CMP_EQ)
+    || is_token(TOKEN_CMP_NEQ)
+    || is_token(TOKEN_LESS)
+    || is_token(TOKEN_LESSEQ)
+    || is_token(TOKEN_GREATER)
+    || is_token(TOKEN_GREATEREQ)
+    
+    ;
+}
 Expr* parse_cmp(){
   Expr* elhs = new Expr;
-  elhs = parse_plus_minus();
-  while(   is_token(TOKEN_CMP_EQ)
-	|| is_token(TOKEN_CMP_NEQ)
-	|| is_token(TOKEN_LESS)
-	|| is_token(TOKEN_GREATER)
-	){
+  elhs = parse_binary();
+  while(is_token_cmp()){
     EXPR_CMP_KIND op = make_cmp_kind();
     next_token();    
     
     Expr* erhs = new Expr;
-    erhs = parse_plus_minus();
+    erhs = parse_binary();
     elhs = expr_make_cmp(elhs, erhs, op);
   }
   return elhs;  
@@ -261,7 +299,17 @@ Expr* parse_if_expr(){
   return expr;
 }
 Expr* parse_expr(){
-  return parse_if_expr();
+  Expr* lhs = parse_if_expr();
+  if(expect_name("as")){
+    Expr* cast = new Expr;
+    TypeField* casting_to = new TypeField;
+    casting_to->type = parse_type();
+    cast->kind = EXPRKIND_CAST;
+    cast->as.cast.type = casting_to;
+    cast->as.cast.expr = lhs;
+    return cast;
+  }
+  return lhs;
 }
 Type* parse_type(){
   Type* type = new Type;
@@ -281,8 +329,11 @@ Type* parse_type(){
     token.name++;
   }
   type->size = 0;
-  if(*token.name == 'i'){
-    type->kind = TYPE_I64;
+  if(*token.name == 'i' or *token.name == 'f'){
+    type->kind =
+      *token.name == 'i'
+      ? TYPE_I64
+      : TYPE_F64;
     token.name++;
     type->size = (size_t)atoi(token.name);
     if(type->size != 8  and
@@ -292,7 +343,8 @@ Type* parse_type(){
        )
       {
 	fprintf(stderr,
-		"ERROR: type int expects 8, 16, 32 or 64.\n");
+		"ERROR: type %s expects 8, 16, 32 or 64.\n",
+		type->kind == TYPE_I64? "int": "float");
 	exit(1);
       }
     type->size /= 8;
@@ -307,14 +359,15 @@ Type* parse_type(){
   next_token();
   if(expect_token(TOKEN_OPEN_S_PAREN)){
     Type* t = new Type;
-    t->kind = TYPE_ARRAY;
-    t->array.base = type;
-    t->array.size = nullptr;
+    t->kind = TYPE_PTR;
+    t->ptr.base = type;
+    t->size = 0;
     t->name       = type->name;
     t->size = 0;
     if(!is_token(TOKEN_CLOSE_S_PAREN)){
-      t->array.size = parse_expr();
-      t->size = sizeof_type(t);
+      Expr* arrsz = parse_expr();
+      assert(arrsz->kind == EXPRKIND_INT);
+      t->size = arrsz->as.INT;     
     }
     MustExpect(TOKEN_CLOSE_S_PAREN);    
     return t;
