@@ -2,6 +2,7 @@
 #ifndef __order__
 #define __order__
 #include "./ast.cpp"
+#include "./compiler.cpp"
 
 typedef struct Sym Sym;
 typedef struct Entity Entity;;
@@ -70,24 +71,9 @@ void sym_push(Decl* decl){
   };
   buf__push(sym_list, pushable);
 }
-struct Typedef {
-  const char* name;
-  Type*       type;
-};
-Typedef** typedefs = NULL;
-Typedef* Typedef_get(const char* name){
-  for(size_t i=0; i < buf__len(typedefs); ++i){
-    if(STR_CMP(typedefs[i]->name, name)) return typedefs[i];
-  }
-  return NULL;
-}
-void Typedef_push(const char* name, Type* type){
-  assert(!Typedef_get(name));
-  buf__push(typedefs, new Typedef{
-      .name = name,
-      .type = type
-    });
-}
+
+
+
 Type* complete_type(Type* t){
   assert(t->kind == TYPE_UNSOLVED);  
   Typedef* tf = Typedef_get(t->name);
@@ -116,7 +102,7 @@ Type* order_type(Type* type){
   }
   return type;
 }
-
+// Type checking
 
 void order_decl_var(Decl* decl){
   // TODO :order_type_field(var->type_field);
@@ -124,12 +110,9 @@ void order_decl_var(Decl* decl){
   if(vt->kind == TYPE_UNSOLVED){
     vt = complete_type(vt);
   }
-  Type* var_type = order_type(vt);  
+  order_type(vt);  
   if(decl->as.varDecl.expr){
-    ResolvedExpr* rexpr = order_expr(decl->as.varDecl.expr);
-    (void) rexpr;
-    printf("[WARNING]: type check is not on for testing.\n");
-    //type_check(var_type, rexpr->type, "at var declaration");    
+    order_expr(decl->as.varDecl.expr);    
   }
 }
 void order_decl_import(Decl* decl){
@@ -269,8 +252,10 @@ void order_decl(Decl* decl){
   case DeclKind::DECL_VAR:
     order_decl_var(decl);
     break;
-  case DeclKind::DECL_PROC:   
+  case DeclKind::DECL_PROC:
+    current_decl = decl;
     order_decl_proc(decl);
+    current_decl = NULL;
     break;
   case DeclKind::DECL_ENUM:
     break;

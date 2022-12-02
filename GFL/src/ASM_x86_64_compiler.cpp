@@ -512,6 +512,9 @@ static Type* gen_expr(Expr* expr){
     else if (Macro* macro = GFL_Macros_find(expr->name)){
       return gen_expr(macro->expr);
     }
+    else if (STR_CMP(expr->name, "pass")){
+      return Type_none();
+    }
     else {
       print_expr(expr);
       fprintf(stderr,
@@ -527,37 +530,12 @@ static Type* gen_expr(Expr* expr){
     Proc* proc = Proc_get(&procs, call->p_name);    
     if(!proc){
       Sym* after_declares_proc = sym_get(call->p_name);
-      
-      if(!after_declares_proc){ 
-	// Never declared
-	fprintf(stderr,
-		"ERROR: the procedure '%s' was not declared in this scope.\n",
-		call->p_name);
-	exit(1);
-      }
+      assert(after_declares_proc);            
       // Declared after the call
       proc = &after_declares_proc->decl->as.procDecl;
     }      
     if(proc->args){
-      size_t call_argsSize = call->args_size;
-      size_t proc_argsSize = proc->args->vars_size;
-      if(call_argsSize != proc_argsSize){
-	assert(call_argsSize < proc_argsSize);
-	for(size_t i=call_argsSize; i < buf__len(proc->args->vars); ++i){
-	  Var* param = proc->args->vars[i];
-	  if(param->expr){
-	    buf__push(call->args, param->expr);
-	  }
-	  else {
-	    fprintf(stderr,
-		    "ERROR: expected %zu arguments but got %zu when calling procedure '%s'\n",
-		    proc_argsSize,
-		    call_argsSize,
-		    proc->name);
-	    exit(1);
-	  }
-	}	
-      }
+      assert(call->args_size == proc->args->vars_size);
     }
     int stack_args = push_callargs(proc, call->args);
     int gp = 0, fp = 0;    
@@ -624,15 +602,7 @@ static Type* gen_expr(Expr* expr){
     
     else {
       assert(expr->as.Reasign.token.kind == TOKEN_EQ);
-    }
-    if (!Type_cmp(texpr, tvar)){
-      fprintf(stderr,
-    	      "ERROR: can not re-asign the var '%s' from type '%s' to an type '%s'.\n",
-	      current_reasign_var,
-    	      typekind_cstr(tvar), 
-    	      typekind_cstr(texpr));
-      exit(1);
-    }
+    }    
     store(tvar);
     DEBUG_OK;
     return Type_none();
@@ -801,25 +771,9 @@ static void gen_stmt(Stmt* stmt){
   } break;
   case STMTKIND_RETURN: {
     assert(current_decl);
-    if(current_decl->as.procDecl.ret_type->kind == TYPE_NONE){
-      fprintf(stderr,
-	      "ERROR: return only works in non-void procedures.\n");
-      exit(1);
-    }
-    Type* got_type = stmt->as.expr ? gen_expr(stmt->as.expr) : Type_none();
-    Type* expected_type = current_decl->as.procDecl.ret_type;
-    //if(stmt->as.expr){      
-    //  tret = gen_expr(stmt->as.expr);      
-    //}
-
-    if(!Type_cmp(got_type, expected_type)){
-      fprintf(stderr,
-	      "ERROR: expected type '%s' in early return inside procedure '%s', but got type '%s'.\n",
-	      typekind_cstr(expected_type),
-	      current_decl->as.procDecl.name,
-	      typekind_cstr(got_type));
-      exit(1);
-    }    
+    stmt->as.expr
+      ? gen_expr(stmt->as.expr)
+      : Type_none();    
     println("\tjmp .L.return.%s", current_decl->as.procDecl.name);
   } break;
   case STMTKIND_LOCAL_VAR: {
@@ -944,7 +898,6 @@ void decl_asm(Decl* decl){
   case DECL_PROC:
     current_proc = &decl->as.procDecl;
     init_args(decl->as.procDecl.args);
-    Proc_push(&procs, decl);
     current_decl = decl;
     AssemblerPROC(decl);
     buf__free(local_vars);

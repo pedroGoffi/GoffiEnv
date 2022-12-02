@@ -7,6 +7,7 @@ const char*  program = NULL;
 #define LEXER_HAS_LOCATION        
 #include "../common/utils.cpp"
 #include "./src/parser.cpp"
+#include "./src/typechecker.cpp"
 #include "./src/ordering.cpp"
 #include "./src/compiler.cpp"
 #include "./src/ASM_x86_64_compiler.cpp"
@@ -72,6 +73,7 @@ int main(int argc, char** argv){
   
   // TODO: order_ast without bug
   Decl** ast = order_ast(parse_from_file(input_fp));
+  typecheck_ast(ast);
   switch(compiler_mode){
   case NONE:
   case DUMP_AST:

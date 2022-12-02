@@ -1,11 +1,11 @@
-#import "std/std.gfl" 
+//#import "std/std.gfl" 
 
 
-proc some(x: i64): *char = return  "hello, world\n";
+proc gen_expr(e: i64): void = {
+  __print__(420);
+}
+
 proc main(): void {
-  var str: *char = some(1);
-  puts(str);
-  //*str = 1;
-  //puts(str, 1);
-  //str = 1; 
+  pass if 0 else gen_expr(420);
+  
 }

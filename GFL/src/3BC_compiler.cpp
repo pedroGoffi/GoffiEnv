@@ -2,6 +2,10 @@
 #define __3bc_assembler
 #include "./ast.cpp"
 #include "./compiler.cpp"
+#define __REG(n) "___pseudo_register" #n "___"
+#define REG1 __REG(1)
+#define REG2 __REG(2)
+
 #define STRING_MODE println("\tMODE NILL 0d2 # String mode")
 #define CALL_MODE   println("\tMODE NILL d42 # Call mode")
 
@@ -13,24 +17,32 @@
 static void expr_3bc(Expr* e);
 static bool try_make_builtin_3bc(Call* c){
   const char* pname = c->p_name;
-#define DOIF(str, ...) if(STR_CMP(c->p_name, (str))) {{__VA_ARGS__} return true;}
-  if(STR_CMP(pname, "__set_acc"))
-    DOIF("__set_acc", {    
-	Expr* arg = c->args[0];
-	assert(arg);
-	if(arg->kind != EXPRKIND_INT){
-	  fprintf(stderr,
-		  "ERROR: 3bc builtin call __set_acc expect digit in the first argument.\n");
-	  exit(1);
-	}
-	println("\tMODE NILL 8");
-	println("\tALLOC 0   %i", arg->as.INT);
-      });
-  DOIF("write", {
+#define DOIF(str, ...)				\
+  if(STR_CMP(c->p_name, (str))) {		\
+    {__VA_ARGS__}				\
+    println("\t# Built-in gfl -> 3bc %s", str); \
+    return true;				\
+  }
+  //
+
+  DOIF("__set_acc", {    
       Expr* arg = c->args[0];
       assert(arg);
-      expr_3bc(arg);
-      println("\t# Builtin gfl -> 3bc write");
+      assert(arg->kind == EXPRKIND_INT);
+      println("\tMODE NILL 8");
+      println("\tALLOC 0   %i", arg->as.INT);
+    });
+  DOIF("__writestr__", {
+      Expr** args = c->args;
+      for(size_t i=0; i < buf__len(args); ++i){
+	Expr* arg = args[i];
+	assert(arg->kind == EXPRKIND_STRING_LITERAL);
+	const char* str = arg->as.STRING;
+	STRING_MODE;    
+	for(size_t i=0; i + 1< buf__len(str); ++i){
+	  println("\tSTRC 5 %zu", str[i]);
+	}
+      }
     });
 #undef DOIF
   return false;
@@ -42,12 +54,7 @@ static void expr_3bc(Expr* e){
     println("\tALLOC NILL %i", e->as.INT);
     break;
   case EXPRKIND_STRING_LITERAL: {
-    const char* str = e->as.STRING;
-    STRING_MODE;    
-    for(size_t i=0; i + 1< buf__len(str); ++i){
-      println("\tSTRC 5 %zu", str[i]);
-    }
-    
+    assert(false && "UNIMPLEMENYED STRINGS");    
   } break;
   case EXPRKIND_NAME: {
     if(Var* global_var = Var_get(&global_vars, e->name)){
@@ -122,6 +129,8 @@ void decl_3bc(Decl* d){
     exit(1);
   }
 }
+void init_pseudo_regs(){
+}
 void entry_3bc(){
   LABEL_3bc("_start");
   for(size_t i=0; i < buf__len(global_vars); ++i){
@@ -132,6 +141,7 @@ void entry_3bc(){
       exit(1);
     }
   }
+  init_pseudo_regs();
   CALL_MODE;  
   println("\tCALL NILL :main");
 }

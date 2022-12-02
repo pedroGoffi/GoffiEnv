@@ -1,4 +1,5 @@
 // NOTE: 3bc mode types are ignored
 proc main(): i64 {
-  write("hello, world!\n");  
+  __writestr__("hello, world!\n");
+  __set_acc(0);
 }

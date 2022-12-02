@@ -548,7 +548,10 @@ struct TypeField{
   Type* type;
 };
 
-
+struct Typedef {
+  const char* name;
+  Type*       type;
+};
 enum DeclKind{
   DECL_NONE,
   DECL_ENUM,

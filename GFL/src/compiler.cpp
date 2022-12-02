@@ -1,7 +1,19 @@
 #ifndef __resolve
 #define __resolve
 #include "./ast.cpp"
-
+#include "../../common/utils.cpp"
+const char* built_in_kws[] = {
+  "__print__", // asm bultins
+  "__asm__",
+  "__set_acc", // 3bc bultins
+  "__writestr__",
+};
+bool is_builtin(const char* name){
+  for(auto& str: built_in_kws){
+    if(STR_CMP(name, str)) return true;
+  }
+  return false;
+}
 // compiler behaviour vars
 size_t       rbp_stack_offset		= 0;
 int          depth			= 0;
@@ -14,6 +26,7 @@ const        char* current_reasign_var	= NULL;
 FILE*        output_file		= NULL;
 Var**        local_vars			= NULL;
 Var**        global_vars		= NULL;
+Typedef**    typedefs                   = NULL;
 const char** strings			= NULL;
 Proc**       procs			= NULL;
 #define DEBUG_OK							\
@@ -62,7 +75,19 @@ void Var_push(Var*** vars, Var* var){
   assert(!Var_get(vars, var->type_field->name));
   buf__push(*vars, var);
 }
-
+Typedef* Typedef_get(const char* name){
+  for(size_t i=0; i < buf__len(typedefs); ++i){
+    if(STR_CMP(typedefs[i]->name, name)) return typedefs[i];
+  }
+  return NULL;
+}
+void Typedef_push(const char* name, Type* type){
+  assert(!Typedef_get(name));
+  buf__push(typedefs, new Typedef{
+      .name = name,
+      .type = type
+    });
+}
 int count(void) {
   static int i = 1;
   return i++;
