@@ -24,62 +24,65 @@ int getTypeId(Type* ty){
     else if (ty->size == 4){
       return ty->is_unsigned ? U32 : I32;
     }
-    else {
-      assert(ty->size == 8);
+    else {      
       return ty->is_unsigned ? U64 : I64;
     }
   }
   return U64;
 }
 // TODO: translate this to asm x86_64
-static char i32i8[] = "movsbl %al, %eax";
-static char i32u8[] = "movzbl %al, %eax";
-static char i32i16[] = "movswl %ax, %eax";
-static char i32u16[] = "movzwl %ax, %eax";
-static char i32f32[] = "cvtsi2ssl %eax, %xmm0";
-static char i32i64[] = "\tmovsxd rax, eax";
-static char i32f64[] = "cvtsi2sdl %eax, %xmm0";
-static char i32f80[] = "mov %eax, -4(%rsp); fildl -4(%rsp)";
+static char i32i8[]	= ";; TODO: \tmovsbl eax, al\n";
+static char i32u8[]	= "\tmovzbl eax, al\n";
+static char i32i16[]	= "movswl %ax, %eax";
+static char i32u16[]	= "movzwl %ax, %eax";
+static char i32f32[]	= "cvtsi2ssl %eax, %xmm0";
+static char i32i64[]	= "\tmovsxd rax, eax\n";
+static char i32f64[]	= "cvtsi2sdl %eax, %xmm0";
+static char i32f80[]	= "mov %eax, -4(%rsp); fildl -4(%rsp)";
 
-static char u32f32[] = "mov %eax, %eax; cvtsi2ssq %rax, %xmm0";
-static char u32i64[] = "mov %eax, %eax";
-static char u32f64[] = "mov %eax, %eax; cvtsi2sdq %rax, %xmm0";
-static char u32f80[] = "mov %eax, %eax; mov %rax, -8(%rsp); fildll -8(%rsp)";
+static char u32f32[]	= "mov %eax, %eax; cvtsi2ssq %rax, %xmm0";
+static char u32i64[]	= "mov %eax, %eax";
+static char u32f64[]	= "mov %eax, %eax; cvtsi2sdq %rax, %xmm0";
+static char u32f80[]	= "mov %eax, %eax; mov %rax, -8(%rsp); fildll -8(%rsp)";
 
-static char i64f32[] = "cvtsi2ssq %rax, %xmm0";
-static char i64f64[] = "cvtsi2sdq %rax, %xmm0";
-static char i64f80[] = "movq %rax, -8(%rsp); fildll -8(%rsp)";
+static char i64f32[]	= "cvtsi2ssq %rax, %xmm0";
+static char i64f64[]	= "cvtsi2sdq %rax, %xmm0";
+static char i64f80[]	= "movq %rax, -8(%rsp); fildll -8(%rsp)";
 
-static char u64f32[] = "cvtsi2ssq %rax, %xmm0";
-static char u64f64[] =
-  "test %rax,%rax; js 1f; pxor %xmm0,%xmm0; cvtsi2sd %rax,%xmm0; jmp 2f; "
+static char u64f32[]	= "cvtsi2ssq %rax, %xmm0";
+
+static char u64f64[]	=
+  "\ttest %rax,%rax\n"
+  "\tjs 1f;\n"
+  "\tpxor %xmm0, %xmm0\n"
+  "\tcvtsi2sd %rax,%xmm0; jmp 2f; "
   "1: mov %rax,%rdi; and $1,%eax; pxor %xmm0,%xmm0; shr %rdi; "
   "or %rax,%rdi; cvtsi2sd %rdi,%xmm0; addsd %xmm0,%xmm0; 2:";
-static char u64f80[] =
+static char u64f80[]	=
   "mov %rax, -8(%rsp); fildq -8(%rsp); test %rax, %rax; jns 1f;"
   "mov $1602224128, %eax; mov %eax, -4(%rsp); fadds -4(%rsp); 1:";
 
-static char f32i8[] = "cvttss2sil %xmm0, %eax; movsbl %al, %eax";
-static char f32u8[] = "cvttss2sil %xmm0, %eax; movzbl %al, %eax";
-static char f32i16[] = "cvttss2sil %xmm0, %eax; movswl %ax, %eax";
-static char f32u16[] = "cvttss2sil %xmm0, %eax; movzwl %ax, %eax";
-static char f32i32[] = "cvttss2sil %xmm0, %eax";
-static char f32u32[] = "cvttss2siq %xmm0, %rax";
-static char f32i64[] = "cvttss2siq %xmm0, %rax";
-static char f32u64[] = "cvttss2siq %xmm0, %rax";
-static char f32f64[] = "cvtss2sd %xmm0, %xmm0";
-static char f32f80[] = "movss %xmm0, -4(%rsp); flds -4(%rsp)";
+static char f32i8[]	= "cvttss2sil %xmm0, %eax; movsbl %al, %eax";
+static char f32u8[]	= "cvttss2sil %xmm0, %eax; movzbl %al, %eax";
+static char f32i16[]	= "cvttss2sil %xmm0, %eax; movswl %ax, %eax";
+static char f32u16[]	= "cvttss2sil %xmm0, %eax; movzwl %ax, %eax";
+static char f32i32[]	= "cvttss2sil %xmm0, %eax";
+static char f32u32[]	= "cvttss2siq %xmm0, %rax";
+static char f32i64[]	= "cvttss2siq %xmm0, %rax";
+static char f32u64[]	= "cvttss2siq %xmm0, %rax";
+static char f32f64[]	= "cvtss2sd %xmm0, %xmm0";
+static char f32f80[]	= "movss %xmm0, -4(%rsp); flds -4(%rsp)";
 
-static char f64i8[] = "cvttsd2sil %xmm0, %eax; movsbl %al, %eax";
-static char f64u8[] = "cvttsd2sil %xmm0, %eax; movzbl %al, %eax";
-static char f64i16[] = "cvttsd2sil %xmm0, %eax; movswl %ax, %eax";
-static char f64u16[] = "cvttsd2sil %xmm0, %eax; movzwl %ax, %eax";
-static char f64i32[] = "cvttsd2sil %xmm0, %eax";
-static char f64u32[] = "cvttsd2siq %xmm0, %rax";
-static char f64i64[] = "cvttsd2siq %xmm0, %rax";
-static char f64u64[] = "cvttsd2siq %xmm0, %rax";
-static char f64f32[] = "cvtsd2ss %xmm0, %xmm0";
-static char f64f80[] = "movsd %xmm0, -8(%rsp); fldl -8(%rsp)";
+static char f64i8[]	= "cvttsd2sil %xmm0, %eax; movsbl %al, %eax";
+static char f64u8[]	= "cvttsd2sil %xmm0, %eax; movzbl %al, %eax";
+static char f64i16[]	= "cvttsd2sil %xmm0, %eax; movswl %ax, %eax";
+static char f64u16[]	= "cvttsd2sil %xmm0, %eax; movzwl %ax, %eax";
+static char f64i32[]	= "cvttsd2sil %xmm0, %eax";
+static char f64u32[]	= "cvttsd2siq %xmm0, %rax";
+static char f64i64[]	= "cvttsd2siq %xmm0, %rax";
+static char f64u64[]	= "cvttsd2siq %xmm0, %rax";
+static char f64f32[]	= "cvtsd2ss %xmm0, %xmm0";
+static char f64f80[]	= "movsd %xmm0, -8(%rsp); fldl -8(%rsp)";
 
 #define FROM_F80_1                                           \
   "fnstcw -10(%rsp); movzwl -10(%rsp), %eax; or $12, %ah; " \
@@ -87,16 +90,16 @@ static char f64f80[] = "movsd %xmm0, -8(%rsp); fldl -8(%rsp)";
 
 #define FROM_F80_2 " -24(%rsp); fldcw -10(%rsp); "
 
-static char f80i8[] = FROM_F80_1 "fistps" FROM_F80_2 "movsbl -24(%rsp), %eax";
-static char f80u8[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
-static char f80i16[] = FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
-static char f80u16[] = FROM_F80_1 "fistpl" FROM_F80_2 "movswl -24(%rsp), %eax";
-static char f80i32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
-static char f80u32[] = FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
-static char f80i64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
-static char f80u64[] = FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
-static char f80f32[] = "fstps -8(%rsp); movss -8(%rsp), %xmm0";
-static char f80f64[] = "fstpl -8(%rsp); movsd -8(%rsp), %xmm0";
+static char f80i8[]	= FROM_F80_1 "fistps" FROM_F80_2 "movsbl -24(%rsp), %eax";
+static char f80u8[]	= FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
+static char f80i16[]	= FROM_F80_1 "fistps" FROM_F80_2 "movzbl -24(%rsp), %eax";
+static char f80u16[]	= FROM_F80_1 "fistpl" FROM_F80_2 "movswl -24(%rsp), %eax";
+static char f80i32[]	= FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
+static char f80u32[]	= FROM_F80_1 "fistpl" FROM_F80_2 "mov -24(%rsp), %eax";
+static char f80i64[]	= FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
+static char f80u64[]	= FROM_F80_1 "fistpq" FROM_F80_2 "mov -24(%rsp), %rax";
+static char f80f32[]	= "fstps -8(%rsp); movss -8(%rsp), %xmm0";
+static char f80f64[]	= "fstpl -8(%rsp); movsd -8(%rsp), %xmm0";
 
 static char *cast_table[][11] = {
   // i8   i16     i32     i64     u8     u16     u32     u64     f32     f64     f80
@@ -133,10 +136,10 @@ static const char *reg_dx(int sz) {
   unreachable();
 }
 static const char* word_from_size(size_t sz){
-  if(sz == 1) return "byte";
-  if(sz == 2) return "word";
-  if(sz == 4) return "dword";
-  if(sz == 8) return "qword";  
+  if(sz == 1) return "BYTE";
+  if(sz == 2) return "WORD";
+  if(sz == 4) return "DWORD";
+  if(sz == 8) return "QWORD";  
   return "";
 }
 static const char *reg_ax(int sz) {
@@ -154,32 +157,29 @@ static Type* load(Type* ty){
   case TYPE_ANY:  // size == 8
   case TYPE_CHAR: // size == 1
   case TYPE_I64: //  size == 1 to 8
+  case TYPE_PTR:
+  case TYPE_STRUCT:
     {
       const char* inst = ty->is_unsigned? "movz" : "movs";
       // TODO: sz 1 and 2
 
       if(ty->size == 1){
-	println("\t%sx rax, %s [rax]", inst,
+	println("\t%sx rax, %s [rax]\n", inst,
 		word_from_size(ty->size));      
       } else if (ty->size == 2){
-	println("\t%sx rax, %s [rax]", inst,
+	println("\t%sx rax, %s [rax]\n", inst,
 		word_from_size(ty->size));
       }
       else if (ty->size == 4){
-	println("\tmovsxd rax, %s [rax]",
+	println("\tmovsxd rax, %s [rax]\n",
 		word_from_size(ty->size));
       }
       else {
-	assert(ty->size == 8);
-	println("\tmov rax, %s [rax]",
+	println("\tmov rax, %s [rax]\n",
 		word_from_size(ty->size));
       }
+      return ty;
     } break;
-  case TYPE_PTR:
-    println("\tmov rax, %s [rax]",
-	    word_from_size(ty->size));
-    return ty->ptr.base;
-
   case TYPE_ARRAY: break;
   default:
     unreachable();
@@ -254,13 +254,13 @@ static void gen_addr(Var* var){
   case TYPE_PTR:
   case TYPE_I64:
   case TYPE_ANY:
+  case TYPE_STRUCT:
     println("\tlea rax, %s [rbp - %i]",
 	    word_from_size(tf->type->size),
 	    (int)var->offset);
     
     break;
-  case TYPE_ARRAY:
-    break;
+  case TYPE_ARRAY: break;
   case TYPE_CHAR:
     println("\tlea eax, %s [ebp - %i]",
 	    word_from_size(tf->type->size),
@@ -325,7 +325,6 @@ static void init_args(ProcArgs* pargs){
 
 static bool test_make_syscall(Call* call, const char* estr, int sys_len){
   if(STR_CMP(call->p_name, estr)){
-    assert(call->args_size == sys_len);
     int LAST_REG = sys_len - 1;
     for(int i = 0; i < LAST_REG; ++i){
       gen_expr(call->args[i]);
@@ -422,8 +421,7 @@ static void gen_expr_cmp(Expr* expr){
   // rax = lhs
   // rbx = rhs
 
-  println("\tcmp rax, rbx");
-  printf("OK\n");
+  println("\tcmp rax, rbx"); 
   switch(op){
   case LT:
     println("\tjge .L.CMP.UNMATCH.%i", cmp_count);
@@ -461,16 +459,17 @@ static Type* gen_cast(Cast* cast){
   if(tok == TYPE_NONE){
     return Type_none();
   }
-  if(tok == TYPE_BOOL){
-    cmp_zero(from);
-    println("\tsetne al");
-    println("\tmovzx eax, al");
-    return Type_int();
-  }
+  // TODO: if(tok == TYPE_BOOL){
+  // TODO:   cmp_zero(from);
+  // TODO:   println("\tsetne al");
+  // TODO:   println("\tmovzx eax, al");
+  // TODO:   return Type_int();
+  // TODO: }
   int t1 = getTypeId(from);
   int t2 = getTypeId(cast->type->type);
   if(cast_table[t1][t2]){
-    println("%s", cast_table[t1][t2]);
+    fprintf(output_file,
+	    "%s", cast_table[t1][t2]);
   }
   return cast->type->type;
 }
@@ -530,13 +529,16 @@ static Type* gen_expr(Expr* expr){
     Proc* proc = Proc_get(&procs, call->p_name);    
     if(!proc){
       Sym* after_declares_proc = sym_get(call->p_name);
-      assert(after_declares_proc);            
+      if(!after_declares_proc){
+	fprintf(stderr,
+		"ERROR: algoritmo '%s' não declarado.\n",
+	        call->p_name);
+	exit(1);
+      }
       // Declared after the call
       proc = &after_declares_proc->decl->as.procDecl;
     }      
-    if(proc->args){
-      assert(call->args_size == proc->args->vars_size);
-    }
+
     int stack_args = push_callargs(proc, call->args);
     int gp = 0, fp = 0;    
     println("\tcall %s", call->p_name);
@@ -590,7 +592,7 @@ static Type* gen_expr(Expr* expr){
       pop("rbx");
       println("\tadd rax, rbx");
     }
-    if(expr->as.Reasign.token.kind == TOKEN_EQLESS){
+    else if(expr->as.Reasign.token.kind == TOKEN_EQLESS){
       // from = to
       gen_expr(expr->as.Reasign.to);
       push();
@@ -667,9 +669,8 @@ static Type* gen_expr(Expr* expr){
     case OP_KIND_SHL:
       println("\tmov rcx, rbx");
       println("\tshl rax, cl");
-      return Type_int();      
+      return Type_int();
     }
-
     unreachable();
     // TODO: optimize this section
 
@@ -703,20 +704,21 @@ static Type* gen_expr(Expr* expr){
     Var* arr = Var_get(&local_vars, expr->as.ArrayAccess.name);
     assert(arr);
     //
+
     gen_addr(arr);
-    load(arr->type_field->type->ptr.base);
     push();
+    
     Type* ty = gen_expr(expr->as.ArrayAccess.expr);
-    println("\tmov rax, rbx");
     assert(ty->kind == TYPE_I64);
-
-    pop("rax");
-    println("\tadd rax, rbx", 12 + (expr->as.INT * 4));
-      
-
-    //println("\tmov rax rdi");
-    return arr->type_field->type->ptr.base;
+    pop("rbx");
+    println("\tadd rbx, rax", (expr->as.INT * 8));
+    println("\tmov rax, rbx");
+    return load(arr->type_field->type);     
   } break;
+  case EXPRKIND_FIELD_ACCESS: {
+    printf("UNIMPLEMSADDSAENTED: EXPRKIND_FIELD_ACCESS\n");
+    exit(1);
+  };
   default:
     print_expr(expr);
     unreachable();
@@ -780,6 +782,7 @@ static void gen_stmt(Stmt* stmt){
     Var_push(&local_vars, stmt->as.var);
     if(stmt->as.var->expr){
       Var* lv = stmt->as.var;
+      assert(lv->type_field->type);
       Type* tvar = lv->type_field->type;
       gen_addr(lv);
       push();
@@ -798,6 +801,9 @@ static void gen_stmt(Stmt* stmt){
   } break;
   case STMTKIND_WHILE:{
     while_lb = count();
+    // int begin = count();
+    // int end   = count();
+    
     int saved_lb = while_lb;
     println(".L.LOOP_BEGIN.%i:", saved_lb);
     gen_expr(stmt->as.__while.expr);
@@ -902,10 +908,6 @@ void decl_asm(Decl* decl){
     AssemblerPROC(decl);
     buf__free(local_vars);
     break;
-  case DECL_VAR: {
-    Var* global_var = &decl->as.varDecl;
-    Var_push(&global_vars, global_var);
-  } break;
   case DECL_NAMESPACE:
     ns_ctx  = true;
     ns_name = (char*)decl->as.Namespace.name;
@@ -938,7 +940,10 @@ void decl_asm(Decl* decl){
 	});
     }
   } break;
-  case DECL_TYPEDEF: break;
+  case DECL_STRUCT:
+  case DECL_VAR: 
+  case DECL_TYPEDEF:
+    break;
   default:
     unreachable();
   }

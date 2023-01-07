@@ -1,8 +1,10 @@
-
-proc main(): void {
-  var x: ui8 = 69;
+// codigo em C;  (tipo)expressao
+// codigo em gfl; expressao como tipo
+algoritmo main(){
+  var I8:   _i8 = 10;
+  var I64: _i64 = 10;
   __print__(
-    x,
-    x as i64
+    I8  como _i64,
+    I64 como _i8
   );
 }

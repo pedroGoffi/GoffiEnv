@@ -1,2 +1,0 @@
-
-//proc exit(exit_code: i64): void = SYSCALL1(exit_code, SYS_exit);

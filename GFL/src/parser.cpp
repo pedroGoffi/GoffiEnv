@@ -204,8 +204,8 @@ Expr* parse_mult(){
   return elhs;
 }
 inline bool is_token_logic(){
-  return token_is_name("or")
-    || token_is_name("and")
+  return token_is_name(OR_KEYWORD)
+    || token_is_name(AND_KEYWORD)
     ;
     
 }
@@ -214,7 +214,7 @@ Expr* parse_logic(){
   lhs = parse_mult();
   while(is_token_logic()){
     Expr* rhs = new Expr;
-    EXPR_BINARY_OP_KIND kind = STR_CMP(consume().name, "and")
+    EXPR_BINARY_OP_KIND kind = STR_CMP(consume().name, AND_KEYWORD)
       ? OP_KIND_AND
       : OP_KIND_OR;
     rhs = parse_mult();
@@ -300,7 +300,7 @@ Expr* parse_if_expr(){
 }
 Expr* parse_expr(){
   Expr* lhs = parse_if_expr();
-  if(expect_name("as")){
+  if(expect_name(AS_KEYWORD)){
     Expr* cast = new Expr;
     TypeField* casting_to = new TypeField;
     casting_to->type = parse_type();
@@ -311,51 +311,76 @@ Expr* parse_expr(){
   }
   return lhs;
 }
-Type* parse_type(){
+Type* parse_builtin_type(){
+  // kind name and size
+  assert(*token.name == '_');
+  token.name++;
   Type* type = new Type;
-
-  if(expect_token(TOKEN_STAR)){
-    type->kind     = TYPE_PTR;
-    type->ptr.base = new Type;
-    type->ptr.base = parse_type();
-    type->size     = sizeof_type(type);
+  if(STR_CMP(token.name, "char")){
+    type->kind = TYPE_CHAR;
+    type->size = 4;
+    type->name = "char";
     return type;
   }
-  assert(token.kind == TOKEN_NAME);
-  
-  type->is_unsigned = false;
-  if(*token.name == 'u'){
-    type->is_unsigned = true;
-    token.name++;
-  }
-  type->size = 0;
-  if(*token.name == 'i' or *token.name == 'f'){
-    type->kind =
-      *token.name == 'i'
-      ? TYPE_I64
-      : TYPE_F64;
+  if(*token.name == 'i'){
+    type->kind = TYPE_I64;    
+    type->name = "int";
     token.name++;
     type->size = (size_t)atoi(token.name);
     if(type->size != 8  and
        type->size != 16 and
        type->size != 32 and
        type->size != 64       
-       )
-      {
-	fprintf(stderr,
-		"ERROR: type %s expects 8, 16, 32 or 64.\n",
-		type->kind == TYPE_I64? "int": "float");
-	exit(1);
-      }
-    type->size /= 8;
-      
+       ){
+      fprintf(stderr,
+	      "ERROR: built-in type I64 can only work with 8, 16, 32 and 64, but got: %zu.\n",
+	      type->size);
+      exit(1);
+    }
+    type->size /= 8;        
+  }
+  else if (*token.name ==  'f'){
+    printf("ERROR: floats are not implemented yet.\n");
+    exit(1);
+  }
+  return type;
+}
+Type* parse_type(){
+  Type* type = new Type;
+  type->is_const = false;
+  if(expect_name("const")){
+    type->is_const = true;
+  }
+  if(expect_token(TOKEN_STAR)){
+    type->kind     = TYPE_PTR;
+    type->ptr.base = new Type;
+    type->ptr.base = parse_type();
+    type->name     = "*";
+    type->size     = sizeof_type(type);
+    return type;
+  }
+  assert(token.kind == TOKEN_NAME);
+
+  type->is_unsigned = false;
+  
+  if(STR_CMP(token.name, UNSIGNED_KEYWORD)){
+    type->is_unsigned = true;
+    next_token();
+  }
+  type->size = 0;
+  // Built in types start with '_'  
+  if(*token.name == '_'){
+    Type* btype = parse_builtin_type();
+    type->kind = btype->kind;
+    type->name = btype->name;
+    type->size = btype->size;      
   }
   else {
     type->kind = TypeFieldKind_by_cstr(token.name);
     if(type->kind != TYPE_NONE and type->kind != TYPE_UNSOLVED)
       type->size = sizeof_type(type);
   }
-  type->name = token.name;
+  type->name = token.name;  
   next_token();
   if(expect_token(TOKEN_OPEN_S_PAREN)){
     Type* t = new Type;
@@ -368,6 +393,9 @@ Type* parse_type(){
       Expr* arrsz = parse_expr();
       assert(arrsz->kind == EXPRKIND_INT);
       t->size = arrsz->as.INT;     
+    }
+    if(STR_CMP(type->name, "mem")){
+      t->size *= 8;
     }
     MustExpect(TOKEN_CLOSE_S_PAREN);    
     return t;
@@ -423,7 +451,7 @@ Elif* parse_elif_nodes(){
     buf__push(nodes_expr, (parse_expr()));
     buf__push(nodes_block, (parse_block()));
     elif->nodes_size++;
-  } while(expect_name("elif")); 
+  } while(expect_name(ELIF_KEYWORD)); 
   elif->node_expr  = nodes_expr;
   elif->node_block = nodes_block;
   return elif;
@@ -593,8 +621,8 @@ Decl* parse_proc_def(){
   proc->as.procDecl.name = proc->name;
   proc->as.procDecl.args = parse_proc_args();  
   // TODO: make a uncomplete type
-  if(is_token(TOKEN_DOUBLE_DOT)){
-    next_token();    
+  proc->as.procDecl.ret_type = Type_none();
+  if(expect_token(TOKEN_DOUBLE_DOT)){    
     proc->as.procDecl.ret_type = parse_type();
   }
   if(is_token(TOKEN_EQ)){
@@ -603,7 +631,7 @@ Decl* parse_proc_def(){
     proc->as.procDecl.block = new StmtList;
     proc->as.procDecl.block->stmts = NULL;
     buf__push(proc->as.procDecl.block->stmts, stmt);
-    proc->as.procDecl.block->stmts_size = 1;
+    proc->as.procDecl.block->stmts_size = buf__len(proc->as.procDecl.block->stmts);
   }
   else if (is_token(TOKEN_OPEN_C_PAREN)){
     proc->as.procDecl.block = parse_block();
@@ -627,10 +655,10 @@ Decl* parse_struct_def(){
   dec->name = consume().name;
   dec->as.structDecl.fields_size = 0;
   MustExpect(TOKEN_OPEN_C_PAREN);
-  TypeField **fields = NULL;
+  Decl **fields = NULL;
   while(!is_token(TOKEN_CLOSE_C_PAREN)){
-    buf__push(fields, (parse_typefield()));
-    MustExpect(TOKEN_DOT_AND_COMMA);
+    buf__push(fields, (parse_decl()));
+    //MustExpect(TOKEN_DOT_AND_COMMA);
     dec->as.structDecl.fields_size++;    
   }
   MustExpect(TOKEN_CLOSE_C_PAREN);
@@ -639,15 +667,16 @@ Decl* parse_struct_def(){
 }
 
 Decl* parse_typedef(){
+  // Syntax: type <name> :: <type>
   const char* name = consume().name;
-  MustExpect(TOKEN_EQ);
+  MustExpect(TOKEN_ACCESS_FIELD);
   Type* equivalent = parse_type();
-  MustExpect(TOKEN_DOT_AND_COMMA);
   Decl* Typedef = new Decl;
   Typedef->kind = DeclKind::DECL_TYPEDEF;
   Typedef->name = name;
-  Typedef->as.Typedef.name	= name;
-  Typedef->as.Typedef.type	= equivalent;
+  Typedef->as.type_def.name	= name;
+  
+  Typedef->as.type_def.type	= equivalent;
   return Typedef;
 }
 EnumFields* parse_enum_fields(){
@@ -692,8 +721,11 @@ Decl* parse_namespace(){
   return ns;
 }
 Decl* parse_import(){
-  MustExpectName("import");
+  MustExpectName(INCLUDE_KEYWORD);
   const char* fp = consume().name;
+  file = fp;
+  if( Included_fp_find(fp) ) return NULL;
+  Included_fp_push(fp);
   FILE* f = fopen(fp, "r");
   assert(f);
   Decl** ast = parse_file(f);
@@ -764,14 +796,16 @@ AST_ROOT parser_run_code(const char* src){
   while(*stream){
 
     if(expect_token(TOKEN_HASHTAG)){      
-      if(token_is_name("import")){
+      if(token_is_name(INCLUDE_KEYWORD)){
 	const char* last_str = stream;
-
+	const char* old_file = file;
 	Decl* node = parse_import();
-	init_stream(last_str);
-	next_token();
-	buf__push(ast, node);
-
+	file = old_file;
+	if(node){
+	  init_stream(last_str);
+	  next_token();
+	  buf__push(ast, node);
+	}
 	continue;
       }
       else {
@@ -808,4 +842,5 @@ Decl** parse_from_file(const char* file_path){
   assert(f);
   return parse_file(f);
 }
+
 #endif /* __parser */

@@ -1,12 +1,13 @@
-cflags =  -lstdc++ \
-	 -Wconversion -Wno-missing-braces \
-	 -pedantic -fno-strict-aliasing \
+cflags = -lstdc++				\
+	 -Wconversion -Wno-missing-braces	\
+	 -pedantic -fno-strict-aliasing		\
 	 -ggdb -std=c++2b -g
+
 cc = gcc-11
 output = debug-app
-input = ./main.cpp 
-
+input = ./main.cpp
 
 compile:
-	${cc} ${input} ${cflags} -o ${output} 
+	@echo "[0] Compiling gfl compiler"
+	${cc} ${input} ${cflags} -o ${output}
 

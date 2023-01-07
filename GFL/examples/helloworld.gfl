@@ -1,3 +1,0 @@
-#import "std/std.gfl"
-
-proc main():void = puts("hello, world!\n");

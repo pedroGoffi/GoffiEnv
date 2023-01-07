@@ -2,12 +2,28 @@
 #define __resolve
 #include "./ast.cpp"
 #include "../../common/utils.cpp"
+struct Compiled_struct{
+  const char* name;
+  size_t      total_alloc;
+  Var**       vars;
+  Proc**      procs;  
+};
 const char* built_in_kws[] = {
-  "__print__", // asm bultins
+  "pass",	// general bultins
+  "__print__",	// asm bultins
   "__asm__",
-  "__set_acc", // 3bc bultins
+  "SYSCALL0",
+  "SYSCALL1",
+  "SYSCALL2",
+  "SYSCALL3",
+  "SYSCALL4",
+  "SYSCALL5",
+  "SYSCALL6",  
+  "__set_acc",	// 3bc bultins
   "__writestr__",
 };
+
+
 bool is_builtin(const char* name){
   for(auto& str: built_in_kws){
     if(STR_CMP(name, str)) return true;
@@ -15,20 +31,56 @@ bool is_builtin(const char* name){
   return false;
 }
 // compiler behaviour vars
-size_t       rbp_stack_offset		= 0;
-int          depth			= 0;
-int          DEBUG_COUNT		= 0;
-bool         load_vars			= true;
-bool         ns_ctx			= false;
-Decl*        current_decl		= NULL;	     
-char*        ns_name			= NULL;
-const        char* current_reasign_var	= NULL;
-FILE*        output_file		= NULL;
-Var**        local_vars			= NULL;
-Var**        global_vars		= NULL;
-Typedef**    typedefs                   = NULL;
-const char** strings			= NULL;
-Proc**       procs			= NULL;
+
+extern Proc*       current_proc;
+size_t             rbp_stack_offset	= 0;
+int                depth		= 0;
+int                DEBUG_COUNT		= 0;
+bool               load_vars		= true;
+bool               ns_ctx		= false;
+Decl*              current_decl		= NULL;	     
+char*              ns_name		= NULL;
+const char*        current_reasign_var	= NULL;
+FILE*              output_file		= NULL;
+Var**              local_vars		= NULL;
+Var**              global_vars		= NULL;
+Typedef**          typedefs             = NULL;
+const char**       strings		= NULL;
+Proc**             procs		= NULL;
+Compiled_struct**  Structs              = NULL;
+
+
+Compiled_struct* Compiled_struct_get(const char* name){
+  for(size_t i=0; i< buf__len(Structs); ++i){
+    if(STR_CMP(Structs[i]->name, name))
+      return Structs[i];
+  }
+  return NULL;
+}
+void current_proc_reserve_memory_for_compiled_struct(Compiled_struct* st)
+{
+  assert(current_proc);
+  current_proc += st->total_alloc;
+}
+void Compiled_struct_push(Compiled_struct* st){
+  assert(!Compiled_struct_get(st->name));
+  buf__push(Structs, st);
+}
+Type* Type_from_compiled_struct(Compiled_struct* st){
+  assert(st);
+  Type* t = new Type;
+  t->kind = TYPE_STRUCT;
+  for(size_t i=0; i < buf__len(st->vars); ++i){
+    Var* field_var = st->vars[i];
+    assert(field_var);
+    assert(field_var->type_field);
+    assert(field_var->type_field->type);
+    Type* field_var_type = field_var->type_field->type;
+    
+    t->size += field_var_type->size;
+  }
+  return t;
+}
 #define DEBUG_OK							\
   if(0) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
 #define unimplemented(st)				\
@@ -75,18 +127,35 @@ void Var_push(Var*** vars, Var* var){
   assert(!Var_get(vars, var->type_field->name));
   buf__push(*vars, var);
 }
-Typedef* Typedef_get(const char* name){
+Typedef* Typedef_get(Typedef*** tflist, const char* name){
   for(size_t i=0; i < buf__len(typedefs); ++i){
     if(STR_CMP(typedefs[i]->name, name)) return typedefs[i];
   }
   return NULL;
 }
-void Typedef_push(const char* name, Type* type){
-  assert(!Typedef_get(name));
-  buf__push(typedefs, new Typedef{
-      .name = name,
-      .type = type
-    });
+void Typedef_push(Typedef*** tflist, Typedef* tf){
+  if(Typedef_get(tflist, tf->name)){
+    fprintf(stderr,
+	    "ERROR: compiler time type definition already declared '%s'.\n",
+	    tf->name);
+    exit(1);
+  }
+  buf__push(*tflist, tf);
+}
+void raise_if_typedef(Type** tptr){
+  Type* type = Type_root(*tptr);
+  bool as_cte = type->is_const;
+  if(type->kind == TYPE_UNSOLVED){
+    if(type->name){
+      if(Typedef* tf = Typedef_get(&typedefs,
+				   type->name)){
+	printf("ty->name = %s\n", type->name);
+	*type = *tf->type;
+	type->is_const = as_cte;
+	raise_if_typedef(&type);
+      }
+    }
+  }
 }
 int count(void) {
   static int i = 1;
@@ -97,5 +166,8 @@ int count(void) {
     fprintf(output_file, __VA_ARGS__);		\
     fprintf(output_file, "\n");			\
   }
-
+#define print(...)				\
+  {						\
+    fprintf(output_file, __VA_ARGS__);		\
+  }
 #endif /* __resolve */

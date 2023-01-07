@@ -38,6 +38,12 @@ void print_expr(Expr* e);
 void print_type(Type* t);
 void print_stmt_list(Block* b);
 
+
+struct Typedef {
+  const char* name;
+  Type*       type;
+};
+
 typedef enum ExprKind{
   EXPRKIND_NONE,
   EXPR_BINARY_OP,
@@ -82,6 +88,8 @@ const char* human_expr_binary_op_kind(EXPR_BINARY_OP_KIND kind){
     break;
   }
 }
+
+
 typedef enum EXPR_CMP_KIND {
   LT  = 1,
   LTE = 2,
@@ -109,7 +117,6 @@ typedef enum TypeKind{
   TYPE_NONE,
   TYPE_ANY,
   TYPE_I64,
-  TYPE_BOOL,
   TYPE_F64,
   TYPE_CHAR,
   TYPE_PTR,
@@ -123,6 +130,7 @@ typedef enum TypeKind{
 struct Type{
   TypeKind kind;
   size_t   size;
+  bool     is_const;
   bool     is_unsigned;
   const char* name;
   union{
@@ -135,7 +143,7 @@ struct Type{
     } array;
     struct{
       TypeField* fields;
-      size_t fields_size;
+      size_t     fields_size;
     } aggregate;
     struct{
       TypeField* params;
@@ -260,7 +268,7 @@ struct Stmt{
       Expr*     cond;
       switchList* node;
     } __switch;
-    Var     *var;
+    Var*    var;
     Block*  stmts;
     Expr*   expr;      
   } as;
@@ -292,6 +300,7 @@ struct Macro{
 };
 
 Macro* GFL_macros = NULL;
+#define INIT_MACRO(_name, _str, _expr) Macro _name = {_str, _expr}
 int GFL_Macros_pos(const char* name){
   for(size_t i=0; i < buf__len(GFL_macros); ++i){
     if(STR_CMP(GFL_macros[i].name, name)){
@@ -328,8 +337,7 @@ TypeFieldKind TypeFieldKind_by_cstr(const char* type){
   DOIF_TYPE("i64",  TYPE_I64);
   
   DOIF_TYPE("f64",  TYPE_F64);
-  DOIF_TYPE("char", TYPE_CHAR);
-  DOIF_TYPE("bool", TYPE_BOOL);
+  DOIF_TYPE("char", TYPE_CHAR);;
   DOIF_TYPE("void", TYPE_NONE);  
 #undef DOIF_TYPE
   return TYPE_UNSOLVED;
@@ -337,12 +345,12 @@ TypeFieldKind TypeFieldKind_by_cstr(const char* type){
 const char* typekind_cstr(Type* t){
   TypeKind kind = t->kind;
   switch(kind){
-  case TypeKind::TYPE_NONE: return "void";
-  case TypeKind::TYPE_I64:  return "i64";
-  case TypeKind::TYPE_F64:  return "f64";
-    
-  case TypeKind::TYPE_ANY:  return "any";
-  case TypeKind::TYPE_CHAR: return "char";
+  case TypeKind::TYPE_NONE:   return "void";
+  case TypeKind::TYPE_I64:    return "i64";
+  case TypeKind::TYPE_F64:    return "f64";
+  case TypeKind::TYPE_STRUCT: return "struct";
+  case TypeKind::TYPE_ANY:    return "any";
+  case TypeKind::TYPE_CHAR:   return "char";
     
   case TypeKind::TYPE_PTR:  {
     assert(t->ptr.base);
@@ -356,10 +364,12 @@ const char* typekind_cstr(Type* t){
   }
  
   case TypeKind::TYPE_ARRAY:
-  case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
   case TypeKind::TYPE_UNSOLVED:
+    assert(t->name);
+    return t->name;
+    break;
   default:
     fprintf(stderr,
 	    "ERROR: unreachable: typekind_cstr(TypeKind kind).\n");
@@ -368,7 +378,13 @@ const char* typekind_cstr(Type* t){
 
 }
 // TODO: create
-
+Type* Type_root(Type* mptr){
+  assert(mptr);
+  if(mptr->kind == TYPE_PTR){
+    return Type_root(mptr->ptr.base);    
+  }
+  return mptr;
+}
 Type* Type_none(){
   auto* res = new Type;
   res->kind = TYPE_NONE;
@@ -393,6 +409,7 @@ Type* Type_ptr(Type* base){
 Type* Type_ptr_copy(Type* ptr){
   assert(ptr->kind == TYPE_PTR);
   auto* res = new Type;
+  res->name = ptr->name;
   res->kind = TYPE_PTR;
   res->ptr.base = new Type;
   memcpy(res->ptr.base, ptr->ptr.base, sizeof(*ptr->ptr.base));
@@ -400,9 +417,7 @@ Type* Type_ptr_copy(Type* ptr){
 }
 
 int sizeof_type(Type* type){
-  switch(type->kind){
-  
-  case TypeKind::TYPE_BOOL:
+  switch(type->kind){ 
   case TypeKind::TYPE_CHAR:
       
     return 1;    
@@ -413,11 +428,11 @@ int sizeof_type(Type* type){
   case TypeKind::TYPE_ARRAY:
     assert(type->array.size->kind == EXPRKIND_INT);
     return sizeof_type(type->array.base) * type->array.size->as.INT;
+  case TypeKind::TYPE_UNSOLVED: break;
   case TypeKind::TYPE_F64: 
   case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
-  case TypeKind::TYPE_UNSOLVED:
     fprintf(stderr,
 	    "ERROR: unhandled sizeof_type.\n");
     exit(1);
@@ -503,6 +518,8 @@ Type* type_alloc(TypeKind kind){
 Type* type_int(){
   return type_alloc(TYPE_I64);
 }
+
+
 typedef struct CachedPtrType{
   Type* base;
   Type* ptr;
@@ -548,10 +565,7 @@ struct TypeField{
   Type* type;
 };
 
-struct Typedef {
-  const char* name;
-  Type*       type;
-};
+
 enum DeclKind{
   DECL_NONE,
   DECL_ENUM,
@@ -586,7 +600,7 @@ struct Decl{
     Var  varDecl;
     Proc procDecl;    
     struct{
-      TypeField **fields;
+      Decl     **fields;
       size_t     fields_size;
     } structDecl;
     struct{
@@ -596,10 +610,11 @@ struct Decl{
       const char* FILENAME;
       bool isStd;
     } cimportDecl;
-    struct{
-      const char* name;
-      Type*       type;
-    } Typedef;
+    Typedef type_def;
+    //struct{
+    //  const char* name;
+    //  Type*       type;
+    //} Typedef;
     struct{
       const char* name;
       Decl**      decls;
@@ -610,7 +625,17 @@ struct Decl{
     } Import;
   } as;
 };
-
+const char** Included_fp = NULL;
+bool Included_fp_find(const char* str){
+  for(size_t i=0; i < buf__len(Included_fp); ++i){
+    if(STR_CMP(str, Included_fp[i])) return true;
+  }
+  return false;
+}
+void Included_fp_push(const char* str){
+  assert(!Included_fp_find(str));
+  buf__push(Included_fp, str);
+}
 Decl**   namespaces = NULL;
 Decl* namespaces_get(const char* root, const char* child=""){
   for(size_t i=0; i < buf__len(namespaces); ++i){
@@ -712,6 +737,15 @@ Expr* expr_int(int val){
     }
   };
 }
+Expr* expr_string(const char* str){
+  return new Expr{
+    .kind = EXPRKIND_STRING_LITERAL,
+    .name = "<built-in_string>",
+    .as   = {      
+      .STRING = str
+    }
+  };
+}
 Expr* expr_reasign(Token token, Expr* from, Expr* to){
   Expr* rs = new Expr;
   rs->as.Reasign.token = token;
@@ -720,6 +754,7 @@ Expr* expr_reasign(Token token, Expr* from, Expr* to){
   rs->kind = EXPRKIND_REASIGN;
   return rs;
 }
+void print_ast(Decl** ast);
 void print_expr(Expr* e){
   if(!e) return;
   switch(e->kind){
@@ -736,7 +771,7 @@ void print_expr(Expr* e){
   case EXPR_COMPARASION:
     printf("(cmp [(");
     print_expr(e->as.comparasion.lhs);
-    printf(") (TODO: print the comparasion symbol) (");
+    printf(") %s (", human_expr_cmp_kind(e->as.comparasion.op));
     print_expr(e->as.comparasion.rhs);
     printf(")])");
     break;
@@ -802,6 +837,8 @@ void print_expr(Expr* e){
     break;
 
   case EXPRKIND_FIELD_ACCESS:
+    printf("EXPRKIND_FIELD_ACCESS");
+    break;
   case EXPRKIND_NONE:
   default:
     printf("Unexpected ExprKind\n");
@@ -853,6 +890,7 @@ void print_type(Type* t){
     exit(1);
   }
 }
+
 void print_typespec(TypeField* k){
   printf("[%s: ", k->name);
   print_type(k->type);
@@ -1023,7 +1061,7 @@ void print_decl(Decl* d){
     ident++;
     for(size_t i=0; i < d->as.structDecl.fields_size; ++i){
       ident();
-      print_typespec(d->as.structDecl.fields[i]);
+      print_decl(d->as.structDecl.fields[i]);
       newline();
     }
     ident--;
@@ -1031,14 +1069,22 @@ void print_decl(Decl* d){
     printf(")");
     break;
   case DeclKind::DECL_TYPEDEF:
-  case DeclKind::DECL_IMPORT: 
+    printf("Typedef\n");
+    break;
+  case DeclKind::DECL_IMPORT:
+    print_ast(d->as.Import.ast);
+    break;
   case DeclKind::DECL_NAMESPACE:
+    printf("Namespace\n");
+    break;
     return;
+
   case DeclKind::DECL_ENUM:
   case DeclKind::DECL_UNION:
   default:
+    
     printf("Unexpected DeclKind\n");
-    exit(1);
+    return;//exit(1);
   }
   // NOTE: for now declarations can not be nested
   ident = 0;

@@ -1,2 +1,3 @@
-true      :: 1
-false     :: 0
+tipodata bool	:: ui8
+verdadeiro	:: 1
+falso		:: 0

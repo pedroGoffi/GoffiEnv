@@ -1,107 +1,83 @@
 // NOTE: INIT_MAX_STR is a 258 array
-INIT_MAX_STR    :: "                                                                                                                                                                                                                                                                  "
-proc write(fd: i64, ptr: *char, ptr_len: i64):void = SYSCALL3(fd, ptr, ptr_len, SYS_write);   
+tipodata string     :: *_char
+__MAX_W_SIZE__ :: 256
+__INIT_MAX_STR__    :: "                                                                                                                                                                                                                                                                  "
 
+algoritmo strlen(str: *char): i64{
+  var len:    i64 = 0;
 
-
-proc strlen(str: *char): i64{
-  var len: i64 = 0;
   var iter: *char = str;
-  while 0 < *iter{
-    len  = len  + 1;
-    iter = (:*char)(iter + 1);
+  enquanto *iter{
+    len  += 1;
+    iter += 1;
   }
-  return len;
-  
+  retorne len;  
 }
 
-proc streq(a: *char, b: *char): i64{
-  // we'll loop so to avoid destruct the original variable
-  
+algoritmo streq(a: *char, b: *char): i64{
   var str1: *char = a;
   var str2: *char = b;
   var s1: i64 = strlen(str1);
   var s2: i64 = strlen(str2);
   
-  if ((s1 < s2) + (s2 < s1)) {return false;}
-  while 0 < *str1 {
-    if (*str1 < *str2) + (*str2 < *str1) { 
-      return false;
-    }
-    str1 = (:*char)(str1 + 1);
-    str2 = (:*char)(str2 + 1);    
+  se ( s1 != s2 ) {retorne falso;}
+  
+  // Loop each character and se they are not equal retorne falso
+  enquanto 0 < *str1 {
+    se *str1 != *str2 {retorne falso;}
+    str1 = str1 + 1 como *char;
+    str2 = str2 + 1 como *char;    
   }
-  return true;
+  retorne verdadeiro;
 }
 
-proc putsf(fd:i64, ptr: *char):void {
-  var size: i64 = strlen(ptr);
-  write(fd, ptr, size);
-}
-proc puts(ptr: *char): void {
-  if !(*ptr == 0) {
-    var size: i64 = strlen(ptr);    
-    write(stdout, ptr, size);
-  }
-}
-proc putln(ptr: *char): void {
-  puts(ptr);
-  puts("\n");
-}
-MAX_W_SIZE :: 256
-proc input(msg: *char=""): *char{
-  puts(msg);
-  // TODO: make arrays for god sake
-  var res: *char  = INIT_MAX_STR;
-  // 258 bytes lol
-  var len: i64 = MAX_W_SIZE;
-  SYSCALL3(stdin, res, len, SYS_read);
-  // chop the new line at the end
-  len = 0;
-  var iter: *char = res;
-  while 10 < *iter{
-    iter = (:*char)(iter + 1);
-    len  = len + 1;
-  }  
-  *iter = (:char)0;
-//  var last_digit:*char = (:*char)(res + len); *last_digit = 0;
-  // FIXME: code will not run if: *(:*char)(res + len) = 0;
 
-  return res;
-}
 
-proc stoi(str: *char): i64{
+
+
+
+algoritmo stoi(str: *char): i64{
   var str_begin: *char = str;
-  if *str_begin == 0{
-    puts("ERROR: can not convert string to integer, got NULL string.\n");
+  se *str_begin == 0{
+    escreva("ERROR: can not convert string to integer, got NULL string.\n");
     SYSCALL1(1, 60);
   }
   var result: i64 = 0;
-  while 0 < *str_begin {
+  enquanto 0 < *str_begin {
     var digit: i64 = *str_begin - '0';
     result	= result * 10;
     result	= result + digit;    
     str_begin	= (:*char)(str_begin + 1);    
   }
-  return result; 
+  retorne result; 
 }
-proc strcat(a: *char, b:*char): *char {
-  var res:  *char	= INIT_MAX_STR;
+
+algoritmo strcat(a: *char, b:*char): *char {
+  var res:  *char	= __INIT_MAX_STR__;
   var iter: *char	= res;
   var asz:  i64		= strlen(a);
   var bsz:  i64		= strlen(b);
   
-  while 0 < asz {
+  enquanto 0 < asz {
     *iter = *a;
     iter = (:*char)(iter + 1);
     a   = (:*char)(a + 1);
     asz = asz - 1;
   }
-  while 0 < bsz {
+  enquanto 0 < bsz {
     *iter = *b;
     iter = (:*char)(iter + 1);
     b   = (:*char)(b + 1);
     bsz = bsz - 1;
   }    
-  return res;
+  retorne res;
 }
+
+algoritmo is_numeric(chr: i64): bool {
+  retorne ('0' <= chr <= '9') como bool;
+}
+
+algoritmo is_alpha(chr: i64): bool {
+  retorne ('a' <= chr <= 'z' ou 'A' <= chr <= 'Z') como bool;
+}
+

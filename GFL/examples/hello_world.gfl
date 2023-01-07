@@ -1,0 +1,4 @@
+#incluir "std/padrao.gfl"
+
+algoritmo main(): i64 = escreva("Ola, mundo!\n");
+

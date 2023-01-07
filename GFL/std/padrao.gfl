@@ -1,0 +1,17 @@
+tipodata i64     :: _i64
+tipodata i32     :: _i32
+tipodata i16     :: _i16
+tipodata i8      :: _i8
+
+
+#incluir "std/syscalls.gfl"
+#incluir "std/string.gfl"
+#incluir "std/gflstdio.gfl"
+#incluir "std/matematica.gfl"
+#incluir "std/file.gfl"
+#incluir "std/bool.gfl"
+
+algoritmo exit(exit_code: i64):void {
+  SYSCALL1(exit_code, SYS_exit);
+}
+

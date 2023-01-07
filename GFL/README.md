@@ -1,3 +1,4 @@
+
 # GFL Goffi-Language
 GFL is a personal language that can transpile to asm x86_64
 
@@ -54,4 +55,15 @@ For example, read/write files
 	}
 
 
+"""
+### objective 
+For now i want to compile the code to C/C++ then slowly make it compiled itself
+TODOS:
+1. Self compiled Allocator
+2. Structs
+
+"""
+
+	GFL -> C -> Binary
+	  \-------> Binary
 """

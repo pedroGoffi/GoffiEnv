@@ -1,5 +1,0 @@
-// NOTE: 3bc mode types are ignored
-proc main(): i64 {
-  __writestr__("hello, world!\n");
-  __set_acc(0);
-}

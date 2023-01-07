@@ -1,7 +1,0 @@
-#import "std/std.gfl"
-
-proc main(argc: i64, argv: *char[]): void {
-  puts("argv is not implemented yet.\n");
-  puts("argc = ");
-  __print__(argc);
-}

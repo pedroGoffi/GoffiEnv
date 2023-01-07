@@ -1,0 +1,29 @@
+algoritmo square(x: i64): i64    =  x * x;
+algoritmo inc64(ptr: *i64): void { *ptr = *ptr + 1;}
+
+algoritmo fact2(x: i64): i64 {
+  se x < 2 {
+    retorne 1;
+  }
+  // Allocate some space in recursion call
+  var r: i64 = fact2(x - 1);
+  retorne x*r;
+}
+algoritmo fact(x: i64): i64 {
+  var res: i64  = 1;
+  var iter: i64 = x;
+  enquanto iter > 0{
+    res  = res * iter;
+    iter -= 1;
+  }
+  retorne res;
+}
+
+algoritmo sum_from_zero(x: i64): i64 = x*(x+1)/2;
+algoritmo sum_range(end:i64, begin:i64=0): i64{
+     // formula: (b²+b - a²-a)/2 b = end, a = begin     
+     var sum_end:   i64 = sum_from_zero(end);
+     var sum_begin: i64 = sum_from_zero(begin) se begin > 0 senao 0;
+     retorne sum_end - sum_begin;
+     //retorne (square(end) + end - square(begin) - begin) / 2;
+}

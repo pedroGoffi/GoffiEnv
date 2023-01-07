@@ -37,6 +37,11 @@ void CompileAsmToBinary(const char* outfp){
 
 int main(int argc, char** argv){
   program = shift(&argc, &argv);
+  if(argc == 0){
+    usage(stderr, program);
+    fprintf(stderr, "ERROR: expected file path.\n");
+    exit(1);
+  }
   const char*  input_fp  = argv[0];
   const char*  output_fp = "out.asm";
   enum CO_OPT  compiler_mode = CO_OPT::GENERATE_ASM_CODE;
@@ -59,6 +64,8 @@ int main(int argc, char** argv){
 
     } else if (STR_CMP(flag, "--debug")){
       debug_mode = true;
+    } else if (STR_CMP(flag, "-gen:ast")){
+      compiler_mode = CO_OPT::DUMP_AST;
     } else if (STR_CMP(flag, "-gen:c")){
       compiler_mode = CO_OPT::GENERATE_C_CODE;
     } else if (STR_CMP(flag, "-gen:3bc")){
@@ -74,15 +81,19 @@ int main(int argc, char** argv){
   // TODO: order_ast without bug
   Decl** ast = order_ast(parse_from_file(input_fp));
   typecheck_ast(ast);
+  if(debug_mode){
+    print_ast(ast);
+  }
+  
   switch(compiler_mode){
   case NONE:
   case DUMP_AST:
     print_ast(ast);
     return 0;
+    
   case GENERATE_C_CODE:
     assembly_c_ast(ast, output_fp);
     return 0;
-    
     
   case GENERATE_ASM_CODE:
     assembly_asmx86_64_ast(ast, output_fp);
