@@ -727,7 +727,12 @@ Decl* parse_import(){
   if( Included_fp_find(fp) ) return NULL;
   Included_fp_push(fp);
   FILE* f = fopen(fp, "r");
-  assert(f);
+  if(!f){
+    fprintf(stderr,
+	    "ERROR: Não foi possivel encontrar o caminho para incluir o arquivo: '%s'\n",
+	    file);
+    exit(1);
+  }
   Decl** ast = parse_file(f);
   Decl* node = new Decl;
 

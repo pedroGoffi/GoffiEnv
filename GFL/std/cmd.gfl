@@ -1,0 +1,14 @@
+#incluir "std/padrao.gfl"
+
+ 
+algoritmo cmd_proxima_flag(argc: *i64, argv: ***char): *char
+{
+  se *argc == 0 {
+    puts("cmd_proxima_flag: ERROR: argc = 0\n");
+    exit(1);    
+  }
+  var flag: *char = **argv;
+  *argv += 8 como **char;
+  *argc -= 1;
+  retorne flag;
+}

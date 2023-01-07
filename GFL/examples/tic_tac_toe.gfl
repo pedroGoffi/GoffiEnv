@@ -28,70 +28,70 @@ algoritmo pegar_cell_item_por_str(str: *char): *char{
   ouse streq(str, "c1") {&C1;}
   ouse streq(str, "c2") {&C2;}
   senao {
-    escreva("ERROR: could not get the cell: str='");
-    escreva(str);
-    escreva("'\n");
+    puts("ERROR: could not get the cell: str='");
+    puts(str);
+    puts("'\n");
     exit(1);
   }
 }
 
-algoritmo escreva_x(row: i64): i64 {
+algoritmo puts_x(row: i64): i64 {
   se row == 0 { // First row
-     escreva(A0);
-     escreva(" ");
-     escreva(A1);
-     escreva(" ");
-     escreva(A2);
-     escreva("\n");     
+     puts(A0);
+     puts(" ");
+     puts(A1);
+     puts(" ");
+     puts(A2);
+     puts("\n");     
   }
   ouse row == 1 {
-     escreva(B0);
-     escreva(" ");
-     escreva(B1);
-     escreva(" ");
-     escreva(B2);
-     escreva("\n");     
+     puts(B0);
+     puts(" ");
+     puts(B1);
+     puts(" ");
+     puts(B2);
+     puts("\n");     
   }
   ouse row == 2 {
-     escreva(C0);
-     escreva(" ");
-     escreva(C1);
-     escreva(" ");
-     escreva(C2);
-     escreva("\n");     
+     puts(C0);
+     puts(" ");
+     puts(C1);
+     puts(" ");
+     puts(C2);
+     puts("\n");     
   }
   senao {
-    escreva("ERROR: could not escreva_x.\n");
+    puts("ERROR: could not puts_x.\n");
     exit(1);
   }
 }
-algoritmo escreva_y(ypos: i64) {
+algoritmo puts_y(ypos: i64) {
   se ypos == 0 {
-    escreva("A | ");
-    escreva_x(0);
+    puts("A | ");
+    puts_x(0);
   } ouse ypos == 1 {
-    escreva("B | ");
-    escreva_x(1);
+    puts("B | ");
+    puts_x(1);
   } ouse ypos == 2 {
-    escreva("C | ");
-    escreva_x(2);
+    puts("C | ");
+    puts_x(2);
   }
 } 
 algoritmo print_table(): void {
-  escreva("    0 : 1 : 2\n");
-  escreva("  +-----------\n");
+  puts("    0 : 1 : 2\n");
+  puts("  +-----------\n");
   var pos: i64 = 0;
   enquanto pos <= 3 {
-    escreva_y(pos);
+    puts_y(pos);
     pos += 1;    
   }
   
 }
 algoritmo existe_ganhador(){}
 algoritmo mostrar_ganhador(ganhador_str: *char){
-  escreva("O ganhador foi: ");
-  escreva(ganhador_str);
-  escreva("!!!\n");
+  puts("O ganhador foi: ");
+  puts(ganhador_str);
+  puts("!!!\n");
 }
 algoritmo main(): void {
   var player:  *char = PLAYER_A ;

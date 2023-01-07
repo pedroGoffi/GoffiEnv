@@ -6,15 +6,15 @@ algoritmo write(
     len: i64
   ) = SYSCALL3(fd, ptr, len, SYS_write);
 
-algoritmo escrevaf(fd: *i64, str: *char) {
+algoritmo putsf(fd: *i64, str: *char) {
   var str_len: i64 = strlen(str) se str senao 0;
   write(fd, str, str_len);
 }
 
-algoritmo escreva(str: *char) = escrevaf(stdout, str);
+algoritmo puts(str: *char) = putsf(stdout, str);
 
 algoritmo entrar(msg: *char=""): *char{
-  escreva(msg);
+  puts(msg);
   // TODO: make arrays for god sake
   var res: *char  = __INIT_MAX_STR__;
   // 258 bytes lol

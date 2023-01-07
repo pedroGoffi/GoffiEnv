@@ -701,18 +701,22 @@ static Type* gen_expr(Expr* expr){
     println("\tnot rax");
   } return Type_int();
   case EXPRKIND_ARRAY_ACCESS:{
+    printf("SORRY, UNIMPLEMENTED:: ARRAYS.\n");
+    exit(1);
+    
     Var* arr = Var_get(&local_vars, expr->as.ArrayAccess.name);
     assert(arr);
-    //
-
-    gen_addr(arr);
-    push();
+    gen_addr(arr);    
+    // array_addr in rax
+    size_t offset = expr->as.ArrayAccess.expr->as.INT * 8;
+    if(offset > 0) println("\tadd rax, %zu", offset);
     
-    Type* ty = gen_expr(expr->as.ArrayAccess.expr);
-    assert(ty->kind == TYPE_I64);
-    pop("rbx");
-    println("\tadd rbx, rax", (expr->as.INT * 8));
-    println("\tmov rax, rbx");
+    //push();    
+    //Type* ty = gen_expr(expr->as.ArrayAccess.expr);
+    //assert(ty->kind == TYPE_I64);
+    //pop("rbx"); // array_addr
+    //println("\tadd rbx, rax");
+    //println("\tmov rax, rbx");
     return load(arr->type_field->type);     
   } break;
   case EXPRKIND_FIELD_ACCESS: {
@@ -1020,6 +1024,7 @@ void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
 
 
   println("_start:");
+  println("\tmov [argc_ptr], rsp");
   for(size_t i=0; i < buf__len(global_vars); ++i){
     Var* global_var = global_vars[i];
     if(global_var->expr){
@@ -1038,17 +1043,21 @@ void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
       println("\tmov [rdi], rax");      
     }
   }
-  println("\tmov rdi, [rsp]");
-  println("\tmov rsi, [rsp + 8]");
+  // argc
+  println("\tmov rdi, [argc_ptr]"); 
+  println("\tmov rdi, [rdi]");
+  // argv
+  println("\tmov rsi, [argc_ptr]");
+  println("\tadd rsi, 8");
+  //
   println("\tmov rbp, rsp");
-  //argc == rdi
-  //argv == rsi
   println("\tcall main");
   println("\tmov rdi, rax");
   println("\tmov rax, 60");
   println("\tsyscall");
-  if(buf__len(global_vars) > 0){
-    println("\tsegment .bss");
+  println("\tsegment .bss");
+  println("\targc_ptr: resq 1");
+  if(buf__len(global_vars) > 0){    
     for(size_t i=0; i < buf__len(global_vars); ++i){
       Var* global_var = global_vars[i];
       println("\t%s: resb %zu",

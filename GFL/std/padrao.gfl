@@ -3,7 +3,6 @@ tipodata i32     :: _i32
 tipodata i16     :: _i16
 tipodata i8      :: _i8
 
-
 #incluir "std/syscalls.gfl"
 #incluir "std/string.gfl"
 #incluir "std/gflstdio.gfl"

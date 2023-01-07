@@ -39,7 +39,7 @@ algoritmo streq(a: *char, b: *char): i64{
 algoritmo stoi(str: *char): i64{
   var str_begin: *char = str;
   se *str_begin == 0{
-    escreva("ERROR: can not convert string to integer, got NULL string.\n");
+    puts("ERROR: can not convert string to integer, got NULL string.\n");
     SYSCALL1(1, 60);
   }
   var result: i64 = 0;
