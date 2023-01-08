@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 0
+:b stdout 102
+[CMD]: nasm -felf64 out.asm -o __TRASH__.o
+[CMD]: ld __TRASH__.o -o out.asm.bin
+[CMD]: rm __TRASH__.o
+
+:b stderr 0
+

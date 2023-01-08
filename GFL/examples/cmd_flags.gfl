@@ -1,0 +1,14 @@
+#incluir "std/padrao.gfl"
+#incluir "std/cmd.gfl"
+
+algoritmo main(argc: i64, argv: **char)
+{
+  enquanto argc
+  {
+    var flag: *char
+    	= cmd_proxima_flag(&argc, &argv);
+    puts("flag = ");
+    puts(flag);
+    puts("\n");
+  }
+}

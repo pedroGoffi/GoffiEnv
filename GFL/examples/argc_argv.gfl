@@ -1,0 +1,12 @@
+#incluir "std/padrao.gfl"
+
+algoritmo main(argc: i64, argv: **char): i64
+{
+  enquanto argc
+  {
+    puts("argv: ");
+    puts(argv[argc - 1]);
+    puts("\n");
+    argc -= 1;
+  }
+}

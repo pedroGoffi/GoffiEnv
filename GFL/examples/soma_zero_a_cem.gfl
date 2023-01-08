@@ -1,0 +1,7 @@
+algoritmo calc_soma(val: i64)
+: i64 = retorne val*(val + 1) / 2;
+
+
+algoritmo main()
+      = __print__(calc_soma(100));
+

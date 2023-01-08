@@ -66,21 +66,7 @@ void Compiled_struct_push(Compiled_struct* st){
   assert(!Compiled_struct_get(st->name));
   buf__push(Structs, st);
 }
-Type* Type_from_compiled_struct(Compiled_struct* st){
-  assert(st);
-  Type* t = new Type;
-  t->kind = TYPE_STRUCT;
-  for(size_t i=0; i < buf__len(st->vars); ++i){
-    Var* field_var = st->vars[i];
-    assert(field_var);
-    assert(field_var->type_field);
-    assert(field_var->type_field->type);
-    Type* field_var_type = field_var->type_field->type;
-    
-    t->size += field_var_type->size;
-  }
-  return t;
-}
+
 #define DEBUG_OK							\
   if(0) printf("[%i]: PASSED BY %s\n", DEBUG_COUNT++, __FUNCTION__);
 #define unimplemented(st)				\

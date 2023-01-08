@@ -1,0 +1,69 @@
+#incluir "std/padrao.gfl"
+#incluir "std/cmd.gfl"
+
+#incluir "gfl/utils.gfl"
+#incluir "gfl/lexer.gfl"
+OUT_PRINT_AST :: 1
+debug :: 1
+
+algoritmo programa_uso(stream: *i64, program: const *char){
+  putsf(stream, "|| uso:\n");
+  putsf(stream, "|| ");
+  putsf(stream, program);
+  putsf(stream, "<SUB COMANDO> [OPÇÂO] <ARQUIVO>\n");
+  putsf(stream, "|| SUB COMANDOS:\n");
+  putsf(stream, "||\t-h       Printa esta tela de ajuda ao stdout\n");
+  putsf(stream, "||\t-o <out> usara <out> como um caminho de arquivo para gerar arquivo\n");
+}
+algoritmo main(argc: i64, argv: **char)
+{
+  var programa: const *char = cmd_proxima_flag(&argc, &argv);
+  
+
+  var compiler_mode: i64;
+  var caminho_input: *char;
+  var caminho_output: *char;
+  enquanto *argv {
+    var flag: *char    = cmd_proxima_flag(&argc, &argv);
+    
+    se   streq(flag, "-h")  ou streq(flag, "--ajuda"){
+      programa_uso(stdout, programa);
+      retorne 0;      
+    }
+    ouse streq(flag, "-o")  ou streq(flag, "--saida") {
+       se argc < 1 {
+         programa_uso(stderr, programa);
+	 puts("ERROR: esperado um caminho apos a flag [-o, --saida].\n");
+	 retorne 1;
+       }       
+      caminho_output = cmd_proxima_flag(&argc, &argv);
+    }
+    ouse streq(flag, "--ast"){
+      compiler_mode = OUT_PRINT_AST;
+    }
+    senao {
+      caminho_input = flag;
+    }
+  }
+  se debug {
+    puts("input: ");
+    puts(caminho_input);
+    puts(" --> ");
+    puts(caminho_output);
+    puts("\nCompiler mode: ");
+    __print__(compiler_mode);
+
+  }
+  //iniciar_stream(arquivo_pegar_texto(caminho_input));
+  __print__(
+    char_parai64('1'),
+    char_parai64('2'),
+    char_parai64('3'),
+    char_parai64('4'),
+    char_parai64('5'),
+    char_parai64('6'),
+    char_parai64('7'),
+    char_parai64('8')
+    
+  );
+}

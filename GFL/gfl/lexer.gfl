@@ -1,0 +1,54 @@
+var stream: *char;
+tipodata char :: i64
+TOKEN_NADA :: 0
+TOKEN_NOME :: 1
+TOKEN_INT  :: 2
+
+var token_kind: _i8;
+var token_text: *char;
+var token_INT:  i64;
+
+algoritmo char_parai64(c: i64): i64{
+  se   c == '0' { retorne 0; }
+  ouse c == '1' { retorne 1; }
+  ouse c == '2' { retorne 2; }
+  ouse c == '3' { retorne 3; }
+  ouse c == '4' { retorne 4; }
+  ouse c == '5' { retorne 5; }
+  ouse c == '6' { retorne 6; }
+  ouse c == '7' { retorne 7; }
+  ouse c == '8' { retorne 8; }
+  ouse c == '9' { retorne 9; }  
+  ouse c == 'a' { retorne 10; }
+  ouse c == 'b' { retorne 11; }
+  ouse c == 'c' { retorne 12; }
+  ouse c == 'd' { retorne 13; }
+  ouse c == 'e' { retorne 14; }
+  ouse c == 'f' { retorne 15; }
+  
+  ouse c == 'A' { retorne 10; }
+  ouse c == 'B' { retorne 11; }
+  ouse c == 'C' { retorne 12; }
+  ouse c == 'D' { retorne 13; }
+  ouse c == 'E' { retorne 14; }
+  ouse c == 'F' { retorne 15; }
+  
+  senao retorne 0;
+}
+
+algoritmo charde_escape(c: i64): i64{
+  se c == 'n'  { retorne '\n'; }
+  se c == 'r'  { retorne '\r'; }
+  se c == 't'  { retorne '\t'; }
+  se c == 'v'  { retorne '\v'; }
+  se c == 'b'  { retorne '\b'; }
+  se c == 'a'  { retorne '\a'; }
+  se c == '\\' { retorne '\\'; }
+
+}
+
+algoritmo iniciar_stream(str: *char){
+  stream = str;
+
+}
+

@@ -1,19 +1,40 @@
 #incluir "std/padrao.gfl"
+#incluir "std/errno.gfl"
 
-algoritmo write(
-    fd: *i64,
+
+algoritmo sys_write(
+  fd: i64,
+  ptr: *void,
+  len: i64)
+: i64 = retorne SYSCALL3(fd, ptr, len, SYS_write) como i64;
+
+algoritmo fwrite(
+    fd:  i64,
     ptr: *char,
     len: i64
-  ) = SYSCALL3(fd, ptr, len, SYS_write);
+  ): i64
+{
+  var r: i64 = sys_write(fd, ptr como *void, len);
+  se r < 0
+  {
+    errno = -1 * r;
+    retorne -1;    
+  }
+  senao
+  {
+    errno = 0;
+    retorne r;
+  }
+}
 
-algoritmo putsf(fd: *i64, str: *char) {
+algoritmo putsf(fd: i64, str: *char) {
   var str_len: i64 = strlen(str) se str senao 0;
-  write(fd, str, str_len);
+  fwrite(fd, str, str_len);
 }
 
 algoritmo puts(str: *char) = putsf(stdout, str);
 
-algoritmo entrar(msg: *char=""): *char{
+algoritmo input(msg: *char): *char{
   puts(msg);
   // TODO: make arrays for god sake
   var res: *char  = __INIT_MAX_STR__;

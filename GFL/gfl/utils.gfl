@@ -1,0 +1,5 @@
+algoritmo arquivo_pegar_texto(caminho: *char)
+: *char
+{
+  retorne "proc main(): void {}";
+}

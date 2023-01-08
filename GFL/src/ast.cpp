@@ -120,8 +120,6 @@ typedef enum TypeKind{
   TYPE_F64,
   TYPE_CHAR,
   TYPE_PTR,
-  TYPE_ARRAY,
-  TYPE_STRUCT,
   TYPE_ENUM,
   TYPE_PROC,
   TYPE_UNSOLVED,
@@ -137,10 +135,7 @@ struct Type{
     struct{
       Type* base;
     } ptr;
-    struct{
-      Type* base;
-      Expr* size;      
-    } array;
+
     struct{
       TypeField* fields;
       size_t     fields_size;
@@ -348,7 +343,6 @@ const char* typekind_cstr(Type* t){
   case TypeKind::TYPE_NONE:   return "void";
   case TypeKind::TYPE_I64:    return "i64";
   case TypeKind::TYPE_F64:    return "f64";
-  case TypeKind::TYPE_STRUCT: return "struct";
   case TypeKind::TYPE_ANY:    return "any";
   case TypeKind::TYPE_CHAR:   return "char";
     
@@ -363,7 +357,6 @@ const char* typekind_cstr(Type* t){
     return base;
   }
  
-  case TypeKind::TYPE_ARRAY:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
   case TypeKind::TYPE_UNSOLVED:
@@ -418,19 +411,13 @@ Type* Type_ptr_copy(Type* ptr){
 
 int sizeof_type(Type* type){
   switch(type->kind){ 
-  case TypeKind::TYPE_CHAR:
-      
+  case TypeKind::TYPE_CHAR:      
     return 1;    
   case TypeKind::TYPE_ANY:
   case TypeKind::TYPE_I64:  
-  case TypeKind::TYPE_PTR:  return 8;
-    
-  case TypeKind::TYPE_ARRAY:
-    assert(type->array.size->kind == EXPRKIND_INT);
-    return sizeof_type(type->array.base) * type->array.size->as.INT;
+  case TypeKind::TYPE_PTR:  return 8;   
   case TypeKind::TYPE_UNSOLVED: break;
   case TypeKind::TYPE_F64: 
-  case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
     fprintf(stderr,
@@ -465,8 +452,6 @@ Type* derref_type(Type* type){
     fprintf(stderr,
 	    "ERROR: could not solve Type during Parsing.\n");
     exit(1);
-  case TypeKind::TYPE_ARRAY:
-  case TypeKind::TYPE_STRUCT:
   case TypeKind::TYPE_ENUM:
   case TypeKind::TYPE_PROC:
   default:
@@ -485,10 +470,6 @@ const char* human_type(Type* type){
     return "pointer";
   case TYPE_CHAR:
     return "char";
-  case TYPE_ARRAY:
-    return "array";
-  case TYPE_STRUCT:
-    return "struct";
   case TYPE_ENUM:
     return "procedure";
   case TYPE_PROC:
@@ -569,7 +550,6 @@ struct TypeField{
 enum DeclKind{
   DECL_NONE,
   DECL_ENUM,
-  DECL_STRUCT,
   DECL_UNION,
   DECL_VAR,
   DECL_TYPEDEF,
@@ -599,10 +579,6 @@ struct Decl{
   union{
     Var  varDecl;
     Proc procDecl;    
-    struct{
-      Decl     **fields;
-      size_t     fields_size;
-    } structDecl;
     struct{
       EnumFields* fields;
     } Enum;
@@ -856,14 +832,7 @@ void print_type(Type* t){
 
   case TYPE_UNSOLVED:
     printf("[unsolved: %s]", t->name);
-    break;
-  case TYPE_ARRAY:
-    printf("array(");
-    if(t->array.size)
-      print_expr(t->array.size);
-    printf(")");
-    
-    break;
+    break;    
   case TYPE_NONE:
     printf("none");
     break;
@@ -883,7 +852,6 @@ void print_type(Type* t){
   case TYPE_PROC:
     printf("proc");
     break;
-  case TYPE_STRUCT:
   case TYPE_ENUM:
   default:
     printf("Unexpected TypeFieldKind\n");
@@ -1056,18 +1024,7 @@ void print_decl(Decl* d){
     printf(")");    
     newline();
     break;
-  case DeclKind::DECL_STRUCT:
-    printf("(struct %s\n", d->name);
-    ident++;
-    for(size_t i=0; i < d->as.structDecl.fields_size; ++i){
-      ident();
-      print_decl(d->as.structDecl.fields[i]);
-      newline();
-    }
-    ident--;
-    ident();
-    printf(")");
-    break;
+
   case DeclKind::DECL_TYPEDEF:
     printf("Typedef\n");
     break;
@@ -1079,8 +1036,11 @@ void print_decl(Decl* d){
     break;
     return;
 
-  case DeclKind::DECL_ENUM:
   case DeclKind::DECL_UNION:
+    printf("union\n");
+    return;
+  case DeclKind::DECL_ENUM:
+
   default:
     
     printf("Unexpected DeclKind\n");

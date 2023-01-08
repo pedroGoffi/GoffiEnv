@@ -30,8 +30,10 @@ OBS: NEM TUDO VAI SER TRADUZIDO! como algumas palavras ja são tão comuns em pr
 	#incluir "std/padrao.gfl" // stoi defined here, inside std/string
 	algoritmo main(): void {
 	  var lim: i64 = stoi(input("Digite o numero maxio, para calcular fibonacci: "));
+	  // x0, x1, primeiro e segundo termos fib	  
 	  var x0:  i64  = 0;
 	  var x1:  i64  = 1;
+	  // acc acumulador
 	  var acc: i64  = 0;
 	  enquanto x0 < lim {
 	    x0  = x1 + acc;
@@ -44,6 +46,7 @@ OBS: NEM TUDO VAI SER TRADUZIDO! como algumas palavras ja são tão comuns em pr
 """
 
 	algoritmo factorial(x: i64):*i64 {
+	  // v valor, precisa definir, para alocar 
 	  var v:i64 =  1 se x < 2 senao factorial(x-1);
 	  retorne x*v;
 	}  
@@ -67,4 +70,4 @@ Coloquei entre aspas, pois não considero boas praticas em uma linguagem algo se
 
 1. Espaço entre algoritmos 1 linha
 2. Priorizar uso cedo para evitar muitos 'se/senao'
-3. 
+3. Nome de variaveis e algoritmos devem ser auto-explicativo, ou existir um comentario acima da definição explicando o mesmo

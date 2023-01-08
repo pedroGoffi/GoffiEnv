@@ -1,7 +1,7 @@
-tipodata FILE                       :: i64
-stdin				:: 0 como *i64 //(:*i64)(0)
-stdout				:: 1 como *i64 //(:*i64)(1) 
-stderr				:: 2 como *i64 //(:*i64)(2)
+tipodata FILE                   :: i64
+stdin				:: 0 
+stdout				:: 1  
+stderr				:: 2 
 
 O_READONLY			:: 0 
 O_WRONLY			:: 1 
@@ -15,7 +15,47 @@ O_ALL				:: O_READONLY
                                  + O_TRUNC
 AT_FDCWD                        :: -100
 
-algoritmo openat(path: *char, flag: i64): *FILE{
-  retorne SYSCALL3(AT_FDCWD, path, flag, SYS_openat) como *FILE;
-  
+algoritmo sys_openat(path: *char, flag: i64)
+: *FILE = retorne SYSCALL3(AT_FDCWD,
+			   path,
+			   flag,
+			   SYS_openat) como *FILE;
+
+
+algoritmo assert(cond: i64){
+  se !cond {
+    puts("Assertion falled\n");
+    exit(1);
+  }
+}
+algoritmo fopen(path: *char, flags: *char): i64
+{
+    var iter: i64	= 0;
+    var out_flags: i64	= 0;
+    var fsz:i64		= strlen(flags);
+    se    flags[0] == 'r'
+    {
+      se streq(flags, "r")
+      {
+        retorne sys_openat(path, O_READONLY);
+      }
+      ouse streq(flags, "r+")
+      {        
+        retorne sys_openat(path, O_WRONLY + O_READONLY);
+      }
+      senao {
+        retorne -1;
+      }
+    }
+    se flags[0] == 'w'
+    {
+      puts("ERROR: gfl por enquanto nao consegue criar arquivos.\n");
+      retorne -1;
+    }
+    senao
+    {
+      puts("ERROR: inexperadas flags, em fopen.\n");
+      exit(1);
+    }
+    SYSCALL1(1, 60);
 }

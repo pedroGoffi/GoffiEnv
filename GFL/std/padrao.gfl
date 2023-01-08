@@ -3,14 +3,35 @@ tipodata i32     :: _i32
 tipodata i16     :: _i16
 tipodata i8      :: _i8
 
-#incluir "std/syscalls.gfl"
-#incluir "std/string.gfl"
-#incluir "std/gflstdio.gfl"
-#incluir "std/matematica.gfl"
-#incluir "std/file.gfl"
-#incluir "std/bool.gfl"
+#incluir   "std/syscalls.gfl"
+#incluir   "std/string.gfl"
+#incluir   "std/gflstdio.gfl"
+#incluir   "std/matematica.gfl"
+#incluir   "std/file.gfl"
+#incluir   "std/bool.gfl"
 
 algoritmo exit(exit_code: i64):void {
-  SYSCALL1(exit_code, SYS_exit);
+  SYSCALL1(exit_code, SYS_exit); 
 }
+
+
+algoritmo sys_munmap(
+  addr: *void,
+  len: i64)
+: i64 = retorne SYSCALL2(addr, len, SYS_munmap) como i64;
+
+algoritmo sys_mmap(
+  addr:  *void,
+  len:    i64,
+  prot:   i64,
+  flags:  i64,
+  fd:     i64,
+  offset: i64)
+: i64  = retorne SYSCALL6(addr,
+			  len,
+			  prot,
+			  flags,
+			  fd,
+			  offset,
+			  SYS_mmap) como i64;
 

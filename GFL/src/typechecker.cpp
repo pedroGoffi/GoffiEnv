@@ -17,10 +17,6 @@ void complete_unsolved_type(Type** tptr){
     type->is_const = as_cte;
 	    
   }
-  else if (Compiled_struct* st = Compiled_struct_get(type->name)){
-    *type = *Type_from_compiled_struct(st);
-    type->is_const = as_cte;
-  }
   else {
     fprintf(stderr,
 	    "ERROR: the type '%s', was not declared in this scope.\n",
@@ -167,10 +163,7 @@ Type* typecheck_expr(Expr* expr){
 	? lhs
 	: rhs;	
     }
-    if(lhs->kind == TYPE_STRUCT or rhs->kind == TYPE_STRUCT){
-      printf("[DEV-NOTE]: TODO: typechek structs.\n");
-      return Type_none();
-    }
+
     printf("ERROR:\n");
     //exit(1);
   }
@@ -321,7 +314,6 @@ void typecheck_ast(Decl** ast){
     case DECL_IMPORT:
       typecheck_ast(node->as.Import.ast);
       break;
-    case DECL_STRUCT:  break;
     case DECL_TYPEDEF: break;
     default:
       break;

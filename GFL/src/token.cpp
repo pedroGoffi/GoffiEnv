@@ -89,13 +89,11 @@ typedef struct Token{
 } Token;
 Token token;
 
-const char *human_readable_token(TokenKind kind){  
+const char *human_readable_tokenkind(TokenKind kind){
   switch(kind){
   case TokenKind::TOKEN_AT_SIGN:        return "=";
   case TokenKind::TOKEN_CMP_NEQ:        return "!=";
-  case TokenKind::TOKEN_STRING:		return "string";
-  case TokenKind::TOKEN_INT:		return "number";
-  case TokenKind::TOKEN_NAME:		return "name";
+  case TokenKind::TOKEN_INT:		return "number";  
   case TokenKind::TOKEN_FLOAT:		return "float";
   case TokenKind::TOKEN_BANG:		return "!";
   case TokenKind::TOKEN_HASHTAG:	return "#";
@@ -132,14 +130,19 @@ const char *human_readable_token(TokenKind kind){
   case TokenKind::TOKEN_PERCENT:        return "%";
   case TokenKind::TOKEN_DIV:            return "/";
   case TokenKind::TOKEN_EOF:            return "<EOF>";
-  
-    
-
-  case TokenKind::TOKEN_LAST_CHAR:
-  default:
-    fatal("unexpected tokenkind in human_readable_token.\n");
-    exit(1);
   }
+  printf("ERROR: 0001 TODO: MENSAGEM DE ERRO\n");
+  exit(1);
+}
+const char *human_readable_token(Token token){
+  TokenKind kind = token.kind;
+  if(kind == TOKEN_NAME)
+    return token.name;
+  else if(kind == TOKEN_STRING){
+    return token.STRING;
+  }
+  else
+    return human_readable_tokenkind(kind);
 }
 
 #endif /* __token */

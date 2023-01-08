@@ -33,7 +33,6 @@ ProcArgs* parse_proc_args();
 TypeField*  parse_proc_return();
 
 Decl* parse_proc_def();
-Decl* parse_struct_def();
 Decl* parse_typedef();
 Decl* parse_namespace();
 
@@ -163,7 +162,7 @@ Expr *parse_e0(){
     return e;
   }
   fatal("Unexpected token: `%s` when trying to parse a number.\n",
-	human_readable_token(token.kind));
+	human_readable_token(token));
   exit(1);
 }
 Expr* parse_unary(){
@@ -649,23 +648,6 @@ Decl* parse_proc_def(){
   return proc;
 }
 
-Decl* parse_struct_def(){
-  Decl          *dec = new Decl;
-  dec->kind = DeclKind::DECL_STRUCT;
-  dec->name = consume().name;
-  dec->as.structDecl.fields_size = 0;
-  MustExpect(TOKEN_OPEN_C_PAREN);
-  Decl **fields = NULL;
-  while(!is_token(TOKEN_CLOSE_C_PAREN)){
-    buf__push(fields, (parse_decl()));
-    //MustExpect(TOKEN_DOT_AND_COMMA);
-    dec->as.structDecl.fields_size++;    
-  }
-  MustExpect(TOKEN_CLOSE_C_PAREN);
-  dec->as.structDecl.fields = fields;
-  return dec;
-}
-
 Decl* parse_typedef(){
   // Syntax: type <name> :: <type>
   const char* name = consume().name;
@@ -722,6 +704,7 @@ Decl* parse_namespace(){
 }
 Decl* parse_import(){
   MustExpectName(INCLUDE_KEYWORD);
+
   const char* fp = consume().name;
   file = fp;
   if( Included_fp_find(fp) ) return NULL;
@@ -755,10 +738,7 @@ Decl* parse_decl(){
   else if(expect_name(PROC_KEYWORD)){
     return parse_proc_def();
   }
-
-  else if(expect_name(STRUCT_KEYWORD)){    
-    return parse_struct_def();
-  }
+  
   else if(expect_name(TYPEDEF_KEYWORD)){    
     return parse_typedef();
   }
@@ -774,6 +754,7 @@ Decl* parse_decl(){
   }
   else if(is_token(TOKEN_NAME)){
     const char* tk_name = consume().name;
+
     if(expect_token(TokenKind::TOKEN_ACCESS_FIELD)){
       Expr* macro_body = parse_expr();
       Macro macro = {
@@ -789,7 +770,7 @@ Decl* parse_decl(){
     }
   }
   else {
-    fatal("unexpected token in the global scope: '%s'\n", stream);
+    fatal("unexpected token in the global scope: '%s: %s'\n", human_readable_token(token));
     exit(1);
   }
 }
@@ -799,8 +780,7 @@ AST_ROOT parser_run_code(const char* src){
   init_stream(src);
   AST_ROOT ast = NULL;
   while(*stream){
-
-    if(expect_token(TOKEN_HASHTAG)){      
+    if(expect_token(TOKEN_HASHTAG)){
       if(token_is_name(INCLUDE_KEYWORD)){
 	const char* last_str = stream;
 	const char* old_file = file;
@@ -814,9 +794,7 @@ AST_ROOT parser_run_code(const char* src){
 	continue;
       }
       else {
-	fprintf(stderr,
-		"ERROR: unexpected pre-processor instruction: %s.\n",
-		token.name);
+	printf("UNEXPECTED PRE-PROCESSING.\n");
 	exit(1);
       }
     }

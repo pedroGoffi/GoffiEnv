@@ -5,36 +5,27 @@ __INIT_MAX_STR__    :: "                                                        
 
 algoritmo strlen(str: *char): i64{
   var len:    i64 = 0;
-
-  var iter: *char = str;
-  enquanto *iter{
-    len  += 1;
-    iter += 1;
-  }
-  retorne len;  
+  enquanto str[len += 1]  != '\0'{}
+  retorne len;
 }
 
 algoritmo streq(a: *char, b: *char): i64{
   var str1: *char = a;
   var str2: *char = b;
   var s1: i64 = strlen(str1);
-  var s2: i64 = strlen(str2);
-  
-  se ( s1 != s2 ) {retorne falso;}
+ 
+  se s1 != strlen(str2)
+  { retorne falso; }
   
   // Loop each character and se they are not equal retorne falso
-  enquanto 0 < *str1 {
-    se *str1 != *str2 {retorne falso;}
-    str1 = str1 + 1 como *char;
-    str2 = str2 + 1 como *char;    
+  var i: i64 = 0;
+  enquanto i < s1{
+    se str1[i] != str2[i]
+    { retorne falso; }
+    i += 1;
   }
   retorne verdadeiro;
 }
-
-
-
-
-
 
 algoritmo stoi(str: *char): i64{
   var str_begin: *char = str;

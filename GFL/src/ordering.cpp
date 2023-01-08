@@ -17,7 +17,6 @@ Decl** order_ast(Decl** ast);
 void order_name(const char* name);
 void order_decl_var(Decl* decl);
 void order_decl_proc(Decl* decl);
-void order_decl_struct(Decl* agg);
 void  order_typedef(Decl* td);
 Type* order_type(Type* tf);
 void type_check(Type* a, Type* b, const char* err_msg);
@@ -83,11 +82,6 @@ Type* order_type(Type* type){
   case TYPE_I64:
   case TYPE_F64:   
     break;
-  case TYPE_ARRAY:
-    order_type(type->array.base);
-    if(type->array.size)
-      order_expr(type->array.size);
-    break;
   }
   return type;
 }
@@ -120,11 +114,8 @@ void order_decl_proc(Decl* decl){
     Stmt* stmt = current_proc->block->stmts[i];
     if(stmt->kind == STMTKIND_LOCAL_VAR and
        stmt->as.var->type_field->type->kind == TYPE_UNSOLVED){
-      if(Compiled_struct* st = Compiled_struct_get(stmt->as.var->type_field->type->name)){
-	current_proc->stack_allocation += st->total_alloc;
-	stmt->as.var->offset = current_proc->stack_allocation;
-      }
-      else {
+
+      {
 	printf("ERROR: could not find the type '%s'\n",
 	       stmt->as.var->type_field->type->name);
 	exit(1);
@@ -165,32 +156,7 @@ void order_decl_proc(Decl* decl){
   // There is a return type
   current_proc = NULL;
 }
-void order_decl_struct(Decl* decl){
-  // Structs are defined in compiler time
-  Compiled_struct* st = new Compiled_struct;
-  st->name = decl->name;
-  st->total_alloc = 0;
-  for(size_t i=0; i < buf__len(decl->as.structDecl.fields); ++i){
-    Decl* stDecl = decl->as.structDecl.fields[i];
-    assert(stDecl->kind == DECL_PROC or stDecl->kind == DECL_VAR);
-    if(stDecl->kind == DECL_VAR){
-      Var* var = &stDecl->as.varDecl;
-      assert(var->type_field->type);      
-      st->total_alloc += var->type_field->type->size;
-      buf__push(st->vars, var);
-    }
-    else {
-      print_decl(stDecl);
-      fprintf(stderr,
-	      "ERROR: this decl for struct not implemented yet.\n");
-      exit(1);
-    }
-  }
-  fprintf(stderr,
-	  "[DEV-NOTE]: TODO: order structs.\n"
-	  "TOTAL ALLOC : %i\n", st->total_alloc);
-  Compiled_struct_push(st);
-}
+
 ResolvedExpr* order_expr(Expr* e){
   Type* type = new Type;
   switch(e->kind){
@@ -284,10 +250,6 @@ void order_decl(Decl* decl){
     current_proc = NULL;
     break;
   case DeclKind::DECL_ENUM:
-    break;
-  case DeclKind::DECL_UNION:
-  case DeclKind::DECL_STRUCT:   
-    order_decl_struct(decl);
     break;
   case DeclKind::DECL_TYPEDEF:
     Typedef_push(&typedefs,

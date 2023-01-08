@@ -158,7 +158,6 @@ static Type* load(Type* ty){
   case TYPE_CHAR: // size == 1
   case TYPE_I64: //  size == 1 to 8
   case TYPE_PTR:
-  case TYPE_STRUCT:
     {
       const char* inst = ty->is_unsigned? "movz" : "movs";
       // TODO: sz 1 and 2
@@ -180,7 +179,6 @@ static Type* load(Type* ty){
       }
       return ty;
     } break;
-  case TYPE_ARRAY: break;
   default:
     unreachable();
   }
@@ -194,7 +192,6 @@ static void store(Type* ty){
     
   case TYPE_PTR: 
   case TYPE_I64:
-  case TYPE_ARRAY:
   case TYPE_CHAR:
   case TYPE_ANY:
     // TODO
@@ -254,13 +251,11 @@ static void gen_addr(Var* var){
   case TYPE_PTR:
   case TYPE_I64:
   case TYPE_ANY:
-  case TYPE_STRUCT:
     println("\tlea rax, %s [rbp - %i]",
 	    word_from_size(tf->type->size),
 	    (int)var->offset);
     
     break;
-  case TYPE_ARRAY: break;
   case TYPE_CHAR:
     println("\tlea eax, %s [ebp - %i]",
 	    word_from_size(tf->type->size),
@@ -700,24 +695,30 @@ static Type* gen_expr(Expr* expr){
     gen_expr(expr->as.expr);
     println("\tnot rax");
   } return Type_int();
-  case EXPRKIND_ARRAY_ACCESS:{
-    printf("SORRY, UNIMPLEMENTED:: ARRAYS.\n");
-    exit(1);
-    
+  case EXPRKIND_ARRAY_ACCESS:{    
     Var* arr = Var_get(&local_vars, expr->as.ArrayAccess.name);
+    if(arr->type_field->type->kind != TYPE_PTR){
+      fprintf(stderr,
+	      "ERROR: Não esperado Array, mas recebido: %s\n", human_type(arr->type_field->type));
+      exit(1);
+    }
     assert(arr);
-    gen_addr(arr);    
-    // array_addr in rax
-    size_t offset = expr->as.ArrayAccess.expr->as.INT * 8;
-    if(offset > 0) println("\tadd rax, %zu", offset);
     
-    //push();    
-    //Type* ty = gen_expr(expr->as.ArrayAccess.expr);
-    //assert(ty->kind == TYPE_I64);
-    //pop("rbx"); // array_addr
-    //println("\tadd rbx, rax");
-    //println("\tmov rax, rbx");
-    return load(arr->type_field->type);     
+    gen_expr(expr->as.ArrayAccess.expr);
+    push();
+    println("\tpush %zu", sizeof_type(arr->type_field->type->ptr.base));
+    pop("rbx");
+    pop("rax");
+    println("\tmul rbx");
+    push();
+
+    
+    gen_addr(arr); // &arr    
+    Type* t = load(arr->type_field->type);
+    pop("rbx");
+    // arr
+    println("\tadd rax, rbx");        
+    return load(t->ptr.base);     
   } break;
   case EXPRKIND_FIELD_ACCESS: {
     printf("UNIMPLEMSADDSAENTED: EXPRKIND_FIELD_ACCESS\n");
@@ -944,12 +945,13 @@ void decl_asm(Decl* decl){
 	});
     }
   } break;
-  case DECL_STRUCT:
+
   case DECL_VAR: 
   case DECL_TYPEDEF:
     break;
   default:
-    unreachable();
+    print_decl(decl);
+    //unreachable();
   }
   DEBUG_OK;
   
@@ -1024,7 +1026,7 @@ void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
 
 
   println("_start:");
-  println("\tmov [argc_ptr], rsp");
+
   for(size_t i=0; i < buf__len(global_vars); ++i){
     Var* global_var = global_vars[i];
     if(global_var->expr){
@@ -1044,10 +1046,9 @@ void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
     }
   }
   // argc
-  println("\tmov rdi, [argc_ptr]"); 
-  println("\tmov rdi, [rdi]");
+  println("\tmov rdi, [rsp]");
   // argv
-  println("\tmov rsi, [argc_ptr]");
+  println("\tmov rsi, rsp");
   println("\tadd rsi, 8");
   //
   println("\tmov rbp, rsp");
@@ -1055,9 +1056,9 @@ void assembly_asmx86_64_ast(Decl** ast, const char* output_fp){
   println("\tmov rdi, rax");
   println("\tmov rax, 60");
   println("\tsyscall");
-  println("\tsegment .bss");
-  println("\targc_ptr: resq 1");
-  if(buf__len(global_vars) > 0){    
+
+  if(buf__len(global_vars) > 0){
+    println("\tsegment .bss");
     for(size_t i=0; i < buf__len(global_vars); ++i){
       Var* global_var = global_vars[i];
       println("\t%s: resb %zu",

@@ -81,16 +81,15 @@ void lexer_scan_char(){
   if(*stream == '\''){
     syntax_error("char literal can not be empty\n");
     exit(1);    
-  } else if (*stream == '\n'){
-    syntax_error("char literal can not contain a new line\n");
-    exit(1);    
-  } else if (*stream == '\\'){
+  }
+  else if (*stream == '\\'){
     stream++;
     c = escape_to_char(*stream);
     if(c == 0 && *stream != '0'){
       syntax_error("invalid char literal escape `%c` found.\n", *stream);
       exit(1);
     }
+    stream++;
   } else {
     c = *stream;
     stream++;
@@ -402,8 +401,8 @@ inline bool MustExpect(TokenKind kind){
     return true;
   }
   printf("FATAL: expected `%s`, but got `%s`\n",
-	 human_readable_token(kind),
-	 human_readable_token(token.kind));
+	 human_readable_tokenkind(kind),
+	 human_readable_token(token));
   exit(1);
 }
 inline Token consume(){

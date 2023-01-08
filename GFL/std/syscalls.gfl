@@ -3,7 +3,8 @@
 nullptr				:: 0 como *void
 NULL				:: nullptr
 MAP_SHARED			:: 1 
-MAP_PRIVATE			:: 2 
+MAP_PRIVATE			:: 2
+MAP_FAILED                      :: -1 como *void
 PROT_READ			:: 1 
 PROT_WRITE			:: 2 
 PROT_EXEC			:: 4
@@ -321,4 +322,3 @@ SYS_process_vm_readv		:: 310
 SYS_process_vm_writev		:: 311 
 SYS_kcmp			:: 312 
 SYS_finit_module		:: 313
-
