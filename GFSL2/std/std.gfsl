@@ -1,9 +1,9 @@
 import "./std/core.gfsl"
 
-inline proc fputs int ptr int { write drop }
-inline proc eputs int ptr { stderr fputs }
-inline proc puts  int ptr { stdout fputs }
-inline proc exit  int     { SYS_exit syscall1 drop }
+proc fputs int ptr int { write drop }
+proc eputs int ptr { stderr fputs }
+proc puts  int ptr { stdout fputs }
+proc exit  int     { SYS_exit syscall1 drop }
 
 // INTRISIC HELPERS
 macro nth-argv
@@ -11,37 +11,7 @@ macro nth-argv
 end
 // POINTER ARITHMETRIC
 macro rstore swap store end 
-macro ptr* load end
-macro ptr+ +    end
 
-// STRING LOGIC
-macro str-len  0 + end
-macro str-data 8 + end
-macro str-size 16  end
-// Sizeof(str) 16
-// str! save a string to a pointer
-proc str! 
-   ptr // -- destination
-   int // -- str-size
-   ptr // -- str-pointer
- {
-   // ptr int str
-   local Data 64 end
-   local Len  64 end
-   // dst int str
-
-   Data rstore
-   Len  rstore
-   // dst
-
-   dup str-len  Len  load store
-       str-data Data load store
-       
- }
-// str* derref a pointer std based string
-
-macro str* 
-  dup str-len  load swap
-      str-data load
+macro inot
+  0 ==
 end
-

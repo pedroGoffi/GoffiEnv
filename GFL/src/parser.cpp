@@ -11,6 +11,7 @@
 #include "./token.cpp"
 #include "./grammar.cpp"
 #include "./ordering.cpp"
+#include "./pre_process.cpp"
 AST_ROOT parser_run_code(const char* src);
 Decl** parse_file(FILE* f);
 Expr* parse_binary();
@@ -122,20 +123,7 @@ Expr *parse_e0(){
       MustExpect(TOKEN_CLOSE_R_PAREN);
       return e;
     }
-    else if(expect_token(TOKEN_DOT)){      
-      e->kind = EXPRKIND_FIELD_ACCESS;
-      e->as.FieldAccess.fields_size = 0;
-      e->as.FieldAccess.source = NAME;
-      const char** fields = NULL;
-      buf__push(fields, (consume().name));      
-      while(expect_token(TOKEN_DOT)){
-	printf("%s.", token.name);
-	buf__push(fields, (consume().name));
-	e->as.FieldAccess.fields_size++;	
-      }
-      e->as.FieldAccess.fields = fields;
-      return e;
-    }
+    // TODO: implement field_access :: source.field
     else if(expect_token(TOKEN_OPEN_S_PAREN)){
       e->kind = EXPRKIND_ARRAY_ACCESS;
       e->as.ArrayAccess.name  = NAME;
@@ -143,25 +131,14 @@ Expr *parse_e0(){
       MustExpect(TOKEN_CLOSE_S_PAREN);
       return e;
     }
-    else if(expect_token(TOKEN_ACCESS_FIELD)){
-      e->kind = EXPRKIND_NAMESPACE_GET;
-      e->as.NamespaceGet.name = NAME;
-      e->as.NamespaceGet.rhs  = parse_expr();
-      Decl* ns = namespaces_get(NAME, e->as.NamespaceGet.name);
-      if(!ns){
-	fprintf(stderr,
-		"ERROR: namespace '%s' was not declared in this scope.\n",
-		e->as.NamespaceGet.name);
-	exit(1);
-      }
-      ns->used = true;
-      return e;
-    }
+    // TODO: implement Namespaces
+    
     e->kind       = EXPRKIND_NAME;
     e->name       = NAME;
     return e;
   }
-  fatal("Unexpected token: `%s` when trying to parse a number.\n",
+
+  fatal("Unexpected token: `%s` when trying to parse a expression.\n",
 	human_readable_token(token));
   exit(1);
 }
@@ -327,8 +304,6 @@ Type* parse_builtin_type(){
     token.name++;
     type->size = (size_t)atoi(token.name);
     if(type->size != 8  and
-       type->size != 16 and
-       type->size != 32 and
        type->size != 64       
        ){
       fprintf(stderr,
@@ -643,7 +618,6 @@ Decl* parse_proc_def(){
     exit(1);
   }
   current_proc = NULL;
-  
   
   return proc;
 }

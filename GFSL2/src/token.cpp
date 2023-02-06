@@ -72,7 +72,7 @@ typedef struct __STRING{
   }
 } __STRING;
 typedef struct Token{
-  TokenKind kind;
+  TokenKind     kind;
   TokenModifier modifier;
   union{
     int           INT;

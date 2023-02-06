@@ -110,15 +110,17 @@ void order_decl_import(Decl* decl){
 void order_decl_proc(Decl* decl){
   assert(decl->kind == DeclKind::DECL_PROC);
   current_proc = &decl->as.procDecl;
-  for(size_t i=0; i< buf__len(current_proc->block->stmts); ++i){
-    Stmt* stmt = current_proc->block->stmts[i];
-    if(stmt->kind == STMTKIND_LOCAL_VAR and
-       stmt->as.var->type_field->type->kind == TYPE_UNSOLVED){
+  if(current_proc->block) {
+    for(size_t i=0; i< buf__len(current_proc->block->stmts); ++i){
+      Stmt* stmt = current_proc->block->stmts[i];
+      if(stmt->kind == STMTKIND_LOCAL_VAR and
+	 stmt->as.var->type_field->type->kind == TYPE_UNSOLVED){
 
-      {
-	printf("ERROR: could not find the type '%s'\n",
-	       stmt->as.var->type_field->type->name);
-	exit(1);
+	{
+	  printf("ERROR: could not find the type '%s'\n",
+		 stmt->as.var->type_field->type->name);
+	  exit(1);
+	}
       }
     }
   }

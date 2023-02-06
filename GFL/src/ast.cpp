@@ -82,6 +82,10 @@ const char* human_expr_binary_op_kind(EXPR_BINARY_OP_KIND kind){
   case EXPR_BINARY_OP_KIND::OP_KIND_MINUS: return "-";
   case EXPR_BINARY_OP_KIND::OP_KIND_DIV:   return "/";
   case EXPR_BINARY_OP_KIND::OP_KIND_MULT:  return "*";
+  case EXPR_BINARY_OP_KIND::OP_KIND_SHR:   return ">>";
+  case EXPR_BINARY_OP_KIND::OP_KIND_SHL:   return "<<";
+  case EXPR_BINARY_OP_KIND::OP_KIND_OR:    return "or";
+  case EXPR_BINARY_OP_KIND::OP_KIND_AND:   return "and";
   default:
     printf("ERROR: undefined kind at human_expr_binary_op_kind.\n");
     exit(1);
@@ -386,6 +390,12 @@ Type* Type_none(){
 Type* Type_int(){
   auto* res = new Type;
   res->kind = TYPE_I64;
+  return res;
+}
+Type* Type_i8(){
+  auto* res = new Type;
+  res->kind = TYPE_I64;
+  res->size = 8;
   return res;
 }
 Type* Type_char(){

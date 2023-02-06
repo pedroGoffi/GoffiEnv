@@ -1,0 +1,32 @@
+import "std/std.gfsl"
+import "std/string.gfsl"
+
+static test-count 8 end
+
+proc test-str ptr ptr {
+  "Strings are " puts
+  if load swap load streq inot do
+    " not " puts
+  end
+  " equal: " puts
+  test-count load dump
+  test-count test-count load 1 + store
+}
+macro cstr!
+  swap drop store
+end
+proc main {
+  local A 8 end
+  local B 8 end
+  A "abc" cstr!
+  B "abc" cstr!  
+  A B test-str // 0
+
+  A "abce" cstr!
+  B "abcf" cstr!  
+  A B test-str // 1
+
+  A "abc" cstr!
+  B "cba" cstr!  
+  A B test-str // 2
+}

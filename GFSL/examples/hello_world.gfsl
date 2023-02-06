@@ -1,0 +1,12 @@
+#include "std/std.gfsl"
+
+
+proc printstr int ptr -> void
+do
+  puts
+end
+
+
+proc main do
+  "Hello, world!\n" printstr
+end

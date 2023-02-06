@@ -1,0 +1,35 @@
+age: int  = 10;
+
+FieldKind   :: Enum {
+  NAME
+};
+
+main :: Proc(argc: int, argv: **char) -> void
+{
+  if age != 10 {
+    do_some(age);
+  }
+  switch(some_field_kind)
+  {
+    .NAME => {
+    }
+    default => {
+    }
+  }
+}
+
+fib  :: int x -> int {
+  (x < 2) => 1;
+  x => x * fib (x - 1);
+  
+}
+some :: int = 0;
+get  :: (int x, int y) -> int {
+  _, y => None
+  x, _ => None
+  
+  x, y => {
+   if x != age.HTTPS_fetch return None;
+   fetch(x, {body = y});
+  }
+}

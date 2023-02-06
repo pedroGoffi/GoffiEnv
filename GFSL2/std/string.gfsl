@@ -1,17 +1,82 @@
 import "std/std.gfsl"
+macro str-len  0 + end
+macro str-data 8 + end
+macro str-size 16  end
 
-proc strlen
-{
-  local sa 8 end
-  "UNIMPLEMENTED strlen\n" eputs
-  1 exit
+proc strlen ptr: int {
+  local Str 8  end Str swap load store
+  local Len 8  end Len 0 store
+
+  while
+    Str
+    Len load + load8
+    0 ==
+    0 ==
+    Len
+     Len load 1 +
+    store
+  do end
+  Len load 1 - return
 }
-proc streq
+proc streq ptr ptr: bool
 {
-  local sa 8 end
-  local sb 8 end
-  // sa sb SB
-  sb swap store
-  sa swap store
-  sb strlen dump
+  local B  16 end B str-data swap store
+  local A  16 end A str-data swap store
+  local Res 8 end Res 0 store
+  A str-len
+    A str-data load
+    strlen
+    store
+    
+  B str-len
+    B str-data load
+    strlen
+    store
+  
+  if A str-len load
+     B str-len load
+     == inot
+  do Res 0 store end
+  
+  local charPos 8 end charPos 0 store
+  Res 1 store
+  while A str-data load-ptr
+          charPos load +
+	  load8
+	0 == inot
+  do
+    if A str-data load-ptr charPos load + load8
+       B str-data load-ptr charPos load + load8
+       == inot
+    do
+      Res 0 store
+    end    
+    charPos charPos load 1 + store
+  end
+  Res load-bool
 }
+// str! save a string to a pointer
+proc str! 
+   ptr // -- destination
+   int // -- str-size
+   ptr // -- str-pointer
+ {
+   // ptr int str
+   local Data 64 end
+   local Len  64 end
+   // dst int str
+
+   Data rstore
+   Len  rstore
+   // dst
+
+   dup str-len  Len  load store
+       str-data Data load store
+       
+ }
+// str* derref a pointer std based string
+
+macro str*
+  dup  str-len  load 
+  swap str-data load swap
+end

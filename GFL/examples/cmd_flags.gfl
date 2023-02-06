@@ -1,7 +1,7 @@
 #incluir "std/padrao.gfl"
 #incluir "std/cmd.gfl"
 
-algoritmo main(argc: i64, argv: **char)
+func main(argc: i64, argv: **char)
 {
   enquanto argc
   {

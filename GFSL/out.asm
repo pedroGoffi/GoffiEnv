@@ -1019,7 +1019,6 @@ __287:
     pop rdi
     pop rsi
     pop rdx
-    pop r10
     syscall
     push rax
 __288:
@@ -1277,7 +1276,6 @@ __363:
     pop rdi
     pop rsi
     pop rdx
-    pop r10
     syscall
     push rax
 __364:
@@ -3274,103 +3272,52 @@ __913:
 __914:
 __915:
 __916:
-proc_main:
-   sub rsp, 8
+proc_printstr:
+   sub rsp, 0
    mov [ret_stack_rsp], rsp
    mov rsp, rax
 __917:
 __918:
-__919:
-__920:
-    mov rax, [ret_stack_rsp]
-    add rax, 0
-    push rax
-__921:
-   push 0x0
-__922:
-__923:
-   pop rbx
-   pop rax
-   mov [rax], rbx
-__924:
-__925:
-    mov rax, [ret_stack_rsp]
-    add rax, 0
-    push rax
-__926:
-   pop rax
-   xor rbx, rbx
-   mov rbx, [rax]
-   push rbx
-__927:
-   push 0xa
-__928:
-   mov rcx, 0
-   mov rdx, 1
-   pop rbx
-   pop rax
-   cmp rax, rbx
-   cmovl rcx, rdx
-   push rcx
-__929:
-   pop rax
-   test rax, rax
-   jz __939
-__930:
-    mov rax, [ret_stack_rsp]
-    add rax, 0
-    push rax
-__931:
-   pop rax
-   xor rbx, rbx
-   mov rbx, [rax]
-   push rbx
-__932:
-   mov rax, rsp
-   mov rsp, [ret_stack_rsp]
-   call proc_itos
-   mov [ret_stack_rsp], rsp
-   mov rsp, rax
-__933:
    mov rax, rsp
    mov rsp, [ret_stack_rsp]
    call proc_puts
    mov [ret_stack_rsp], rsp
    mov rsp, rax
-__934:
-   mov rax, 5
+__919:
+   mov rax, rsp
+   mov rsp, [ret_stack_rsp]
+   add rsp, 0
+   ret
+__920:
+__921:
+__922:
+proc_main:
+   sub rsp, 0
+   mov [ret_stack_rsp], rsp
+   mov rsp, rax
+__923:
+__924:
+   mov rax, 14
    push rax
    push data__w9
-__935:
+__925:
    mov rax, rsp
    mov rsp, [ret_stack_rsp]
-   call proc_puts
+   call proc_printstr
    mov [ret_stack_rsp], rsp
    mov rsp, rax
-__936:
-    mov rax, [ret_stack_rsp]
-    add rax, 0
-    push rax
-__937:
+__926:
    mov rax, rsp
    mov rsp, [ret_stack_rsp]
-   call proc_inc64
-   mov [ret_stack_rsp], rsp
-   mov rsp, rax
-__938:
-   jmp __925
-__939:
-   mov rax, rsp
-   mov rsp, [ret_stack_rsp]
-   add rsp, 8
+   add rsp, 0
    ret
-__940:
+__927:
 _start:
    mov [args_ptr], rsp
    mov rax, ret_stack_end
    mov [ret_stack_rsp], rax
    call proc_main
-__941:
+__928:
    mov rax, 60
    mov rdi, 0
    syscall
@@ -3384,7 +3331,7 @@ data__w5: db	0x45,0x52,0x52,0x4F,0x52,0x3A,0x20,0x63,0x6F,0x75,0x6C,0x64,0x20,0x
 data__w6: db	0x60,0x0A,0
 data__w7: db	0x45,0x52,0x52,0x4F,0x52,0x3A,0x20,0x63,0x6F,0x75,0x6C,0x64,0x20,0x6E,0x6F,0x74,0x20,0x6D,0x65,0x6D,0x6F,0x72,0x79,0x20,0x6D,0x61,0x70,0x20,0x74,0x68,0x65,0x20,0x66,0x69,0x6C,0x65,0x20,0x60,0
 data__w8: db	0x60,0x0A,0
-data__w9: db	0x20,0x3D,0x20,0x69,0x0A,0
+data__w9: db	0x48,0x65,0x6C,0x6C,0x6F,0x2C,0x20,0x77,0x6F,0x72,0x6C,0x64,0x21,0x0A,0
 segment .bss
 args_ptr:	     resq 1
 ret_stack_rsp:  resq 1

@@ -1,0 +1,5 @@
+x = 1
+main :: proc (){  
+  write("hello, world!\n")
+  // TODO: string interpolation :)  
+}

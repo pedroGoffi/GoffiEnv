@@ -15,20 +15,20 @@ O_ALL				:: O_READONLY
                                  + O_TRUNC
 AT_FDCWD                        :: -100
 
-algoritmo sys_openat(path: *char, flag: i64)
+func sys_openat(path: *char, flag: i64)
 : *FILE = retorne SYSCALL3(AT_FDCWD,
 			   path,
 			   flag,
 			   SYS_openat) como *FILE;
 
 
-algoritmo assert(cond: i64){
+func assert(cond: i64){
   se !cond {
     puts("Assertion falled\n");
     exit(1);
   }
 }
-algoritmo fopen(path: *char, flags: *char): i64
+func fopen(path: *char, flags: *char): i64
 {
     var iter: i64	= 0;
     var out_flags: i64	= 0;

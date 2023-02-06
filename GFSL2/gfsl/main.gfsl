@@ -3,15 +3,23 @@ static input_fp  16 end
 static output_fp 16 end
 
 import "std/std.gfsl"
-import "gfsl/utils.gfsl"
-import "gfsl/token.gfsl"
-import "gfsl/vr.gfsl"
-import "gfsl/compiler.gfsl"
-proc main {
-  //if argc load 2 < do 
-  //  stderr usage
-  //  Exit
-  //end
-  vr-test
+//import "std/file.gfsl"
+//import "std/string.gfsl"
+//import "gfsl/lexer.gfsl"
+
+macro  token-kind 0  + end // 8
+macro  token-int  9  + end // 8
+macro  token-name 18 + end
+static token 35 end
+
+proc prepare-file ptr{
+  local fp 8 end fp swap load store
+  //local fd 8 end fd O_READONLY fp fopen
+
+//  fd get-file-text init-stream
+}
+proc main {  
+//  1 nth-arg.v prepare-file
+
 }
 

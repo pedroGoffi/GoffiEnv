@@ -10,7 +10,7 @@ macro O_WRONLY     1 end
 macro O_CREAT     64 end
 macro O_APPEND  1024 end
 macro O_TRUNC    512 end
-macro AT_FDCWD  0 100 - end // -1
+macro AT_FDCWD  0 100 - end // -100
 macro MAP_SHARED 1 end
 macro MAP_PRIVATE 2 end
 macro PROT_READ 1 end
@@ -331,7 +331,7 @@ macro SYS_process_vm_readv		 310 end
 macro SYS_process_vm_writev		 311 end
 macro SYS_kcmp				 312 end
 macro SYS_finit_module                   313 end
-macro end 1 end
+
 
 
 // COMMON SYSCALLS
@@ -343,3 +343,9 @@ macro fclose SYS_close  syscall1 end
 macro exit   SYS_exit   syscall1 end 
 macro mmap   SYS_mmap   syscall6 end
 // TODO: inline proc mmap int int int int int int: int{
+macro false 0 cast-bool end
+macro true  1 cast-bool end
+
+macro load-int  load cast-int  end
+macro load-ptr  load cast-ptr  end
+macro load-bool load cast-bool end

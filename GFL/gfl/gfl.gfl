@@ -1,21 +1,19 @@
-#incluir "std/padrao.gfl"
 #incluir "std/cmd.gfl"
-
 #incluir "gfl/utils.gfl"
-#incluir "gfl/lexer.gfl"
+
 OUT_PRINT_AST :: 1
 debug :: 1
 
-algoritmo programa_uso(stream: *i64, program: const *char){
-  putsf(stream, "|| uso:\n");
-  putsf(stream, "|| ");
-  putsf(stream, program);
-  putsf(stream, "<SUB COMANDO> [OPÇÂO] <ARQUIVO>\n");
-  putsf(stream, "|| SUB COMANDOS:\n");
-  putsf(stream, "||\t-h       Printa esta tela de ajuda ao stdout\n");
-  putsf(stream, "||\t-o <out> usara <out> como um caminho de arquivo para gerar arquivo\n");
+func programa_uso(stream: *FILE, program: const *char){
+  fprintf(stream, "|| uso:\n");
+  fprintf(stream, "|| ");
+  fprintf(stream, program);
+  fprintf(stream, "<SUB COMANDO> [OPÇÂO] <ARQUIVO>\n");
+  fprintf(stream, "|| SUB COMANDOS:\n");
+  fprintf(stream, "||\t-h       Printa esta tela de ajuda ao stdout\n");
+  fprintf(stream, "||\t-o <out> usara <out> como um caminho de arquivo para gerar arquivo\n");
 }
-algoritmo main(argc: i64, argv: **char)
+func main(argc: i64, argv: **char): i64
 {
   var programa: const *char = cmd_proxima_flag(&argc, &argv);
   
@@ -25,7 +23,7 @@ algoritmo main(argc: i64, argv: **char)
   var caminho_output: *char;
   enquanto *argv {
     var flag: *char    = cmd_proxima_flag(&argc, &argv);
-    
+    printf("Next flag: %s.\n", flag);
     se   streq(flag, "-h")  ou streq(flag, "--ajuda"){
       programa_uso(stdout, programa);
       retorne 0;      
@@ -33,7 +31,7 @@ algoritmo main(argc: i64, argv: **char)
     ouse streq(flag, "-o")  ou streq(flag, "--saida") {
        se argc < 1 {
          programa_uso(stderr, programa);
-	 puts("ERROR: esperado um caminho apos a flag [-o, --saida].\n");
+	 printf("ERROR: esperado um caminho apos a flag [-o, --saida].\n");
 	 retorne 1;
        }       
       caminho_output = cmd_proxima_flag(&argc, &argv);
@@ -46,24 +44,12 @@ algoritmo main(argc: i64, argv: **char)
     }
   }
   se debug {
-    puts("input: ");
-    puts(caminho_input);
-    puts(" --> ");
-    puts(caminho_output);
-    puts("\nCompiler mode: ");
-    __print__(compiler_mode);
+    printf("input: ");
+    printf(caminho_input);
+    printf(" --> ");
+    printf(caminho_output);
+    printf("\nCompiler mode: ");
 
   }
-  //iniciar_stream(arquivo_pegar_texto(caminho_input));
-  __print__(
-    char_parai64('1'),
-    char_parai64('2'),
-    char_parai64('3'),
-    char_parai64('4'),
-    char_parai64('5'),
-    char_parai64('6'),
-    char_parai64('7'),
-    char_parai64('8')
-    
-  );
+
 }

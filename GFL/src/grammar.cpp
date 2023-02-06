@@ -2,7 +2,7 @@
 #define __grammar
 #define VAR_KEYWORD       "var"
 #define CONST_KEYWORD     "const"
-#define PROC_KEYWORD      "algoritmo"
+#define PROC_KEYWORD      "func"
 #define STRUCT_KEYWORD    "estrutura"
 #define ENUM_KEYWORD      "enumeracao"
 #define UNION_KEYWORD     "uniao"

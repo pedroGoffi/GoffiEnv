@@ -1,0 +1,3 @@
+write("hello, world!\n")
+write("> This is Goffi language Interpreted\n")
+write("> Cool isn't it?\n")

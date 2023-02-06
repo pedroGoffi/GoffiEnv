@@ -1,8 +1,0 @@
-macro  vr-program end
-macro  vr-program_size 16384 + end
-static vr 16392 end
-macro -> "sex? " puts end
-proc vr-test
-{
-  x -> x 
-}

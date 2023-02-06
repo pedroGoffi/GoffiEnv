@@ -1,0 +1,18 @@
+import "std/std.gfsl"
+import "std/string.gfsl"
+
+proc main {
+  local A 16 end
+  local B 16 end
+  A "abcee" str!
+  B "abcee" str!
+
+
+  if
+    A str-data load 
+    B str-data load   
+    streq
+  do
+    "A is eq B" puts
+  end
+} 

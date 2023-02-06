@@ -51,14 +51,14 @@ int char_to_int(char c){
 }
 char escape_to_char(char c){
   switch(c){
-  case '\n': return '\n';
-  case '\r': return '\r';
-  case '\t': return '\t';
-  case '\v': return '\v';
-  case '\b': return '\b';
-  case '\a': return '\a';
-  case '\0': return '\0';
-  default:   return 0;
+  case 'n': return '\n';
+  case 'r': return '\r';
+  case 't': return '\t';
+  case 'v': return '\v';
+  case 'b': return '\b';
+  case 'a': return '\a';
+  case '0': return '\0';
+  default:  return 0;
   }
 }
 
@@ -99,15 +99,16 @@ void lexer_scan_string(){
   stream++;
   char *buf = NULL;
   while(*stream && *stream != '"'){
-    char c = *stream;
+    char c = *stream;   
     if(c == '\n'){
       syntax_error("string literal can not contain newlines.\n");
       exit(1);
     } else if (c == '\\') {
       stream++;
-      c = escape_to_char(c);
-      if(c == 0 && c != '\0'){
-	syntax_error("invalid scape character in string literal '\\%c'.\n", c);
+      c = escape_to_char(*stream);
+      
+      if(c == 0 and *stream != '\0'){
+	syntax_error("invalid scape character in string literal '\\%c'.\n", *stream);
 	exit(1);
       }
     }
@@ -124,6 +125,7 @@ void lexer_scan_string(){
   buf__push(buf, 0);
   token.kind    = TOKEN_STRING;
   token.STRING  = buf;
+  token.name    = buf;
 }
 int number_base;
 // FLOAT = [0-9]*[.][0-9]*([eE][+-]?[0-9]+)?
@@ -219,6 +221,7 @@ void next_token(){
     break;
   case '"':
     lexer_scan_string();
+    printf("found a string = %s", token.STRING);
     break;
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9': {

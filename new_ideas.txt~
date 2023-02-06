@@ -1,0 +1,18 @@
+age: int  = 10;
+
+FieldKind   :: Enum {
+  NAME
+}
+main :: Proc(argc: int, argv: **char) -> void
+{
+  if age != 10 {
+    do_some(age);
+  }
+  switch(some_field_kind)
+  {
+    .NAME => {
+    }
+    default => {
+    }
+  }
+}

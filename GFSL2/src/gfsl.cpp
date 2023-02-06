@@ -40,6 +40,7 @@ enum Op_type{
   CAST_PTR,
   CAST_BOOL,
   PUSH_STR,
+  PUSH_CSTR,
   PLUS,
   MINUS,
   DIVMOD,
@@ -61,6 +62,7 @@ enum Op_type{
   PUSH_PTR,
   PUSH_STATIC_PTR,
   PUSH_LOCAL_PTR,
+  PUSH_EA_LOCAL_PTR,
   //  -----
   SHL,
   SHR,
@@ -86,6 +88,7 @@ enum Op_type{
   LOAD64,  
   STORE8,
   STORE64,
+  RSTORE64,
   EXTEND_MACRO,
   NUM_OF_OPERANDS        
 };
@@ -100,6 +103,7 @@ const char* human_op_type(Op_type type){
     CASE(PROC_LEAVE);
     CASE(PUSH_INT);
     CASE(PUSH_STR);
+    CASE(PUSH_CSTR);
     CASE(PLUS);
     CASE(MINUS);
     CASE(DIVMOD);
@@ -121,6 +125,7 @@ const char* human_op_type(Op_type type){
     CASE(PUSH_PTR);
     CASE(PUSH_STATIC_PTR);
     CASE(PUSH_LOCAL_PTR);
+    CASE(PUSH_EA_LOCAL_PTR);
     CASE(CAST_INT);
     CASE(CAST_PTR);
     CASE(CAST_BOOL);
@@ -145,8 +150,9 @@ const char* human_op_type(Op_type type){
     CASE(SYSCALL6);  
     CASE(LOAD8);
     CASE(LOAD64);  
-    CASE(STORE8);
+    CASE(STORE8);   
     CASE(STORE64);
+    CASE(RSTORE64);
     CASE(EXTEND_MACRO);
   case NUM_OF_OPERANDS:
   default:
@@ -235,7 +241,7 @@ void MACROS_push(MACRO m){
 //
 struct LOCAL{
   const char* name;
-  size_t size   = 0 ;
+  size_t size   = 0;
   size_t offset = 0;
 };
 struct LOCALS{
@@ -243,38 +249,38 @@ struct LOCALS{
   size_t total_offset = 0;
   size_t locals_size  = 0;
 };
-enum Type{TYPE_UNDEFINED, TYPE_INT, TYPE_PTR, TYPE_BOOL, TYPE_VOID};
-Type Type_from_text(const char* str){
+enum GType{GTYPE_UNDEFINED, GTYPE_INT, GTYPE_PTR, GTYPE_BOOL, GTYPE_VOID};
+GType Type_from_text(const char* str){
   printf("Type_from_text : %s\n", str);
   if(STR_CMP(str, "int"))
-    return TYPE_INT;
+    return GTYPE_INT;
   if(STR_CMP(str, "ptr"))
-    return TYPE_PTR;
+    return GTYPE_PTR;
   if(STR_CMP(str, "void"))
-    return TYPE_VOID;
+    return GTYPE_VOID;
   if(STR_CMP(str, "bool"))
-    return TYPE_BOOL;
+    return GTYPE_BOOL;
   
   printf("ERROR: undefined type '%s'\n", str);
   exit(1); 
 }
-const char* Type_cstr(Type type){
+const char* Type_cstr(GType type){
   switch(type){
-  case TYPE_INT:  return "int";
-  case TYPE_PTR:  return "ptr";
-  case TYPE_VOID: return "void";
-  case TYPE_BOOL: return "boolean";
-  case TYPE_UNDEFINED: break;
+  case GTYPE_INT:  return "int";
+  case GTYPE_PTR:  return "ptr";
+  case GTYPE_VOID: return "void";
+  case GTYPE_BOOL: return "boolean";
+  case GTYPE_UNDEFINED: break;
   }
   printf("ERROR: unreachabel at Type_cstr");
   exit(1); 
   
 }
 struct TypeList{
-  Type   stack[GFSL_TYPESTACK_CAP];
+  GType   stack[GFSL_TYPESTACK_CAP];
   size_t stack_size;
 };
-void TypeList_push(TypeList* tl, Type t){
+void TypeList_push(TypeList* tl, GType t){
   assert(tl->stack_size < GFSL_TYPESTACK_CAP);
   tl->stack[tl->stack_size++] = t;
 }
@@ -486,6 +492,9 @@ Inst* inst_from_text(){
   if(token_is_name("dump")){
     inst->type = DUMP;
   }
+  else if (is_token(TOKEN_CMP_EQ)){
+    inst->type = EQUALS;
+  }
   else if (is_token(TOKEN_PLUS)){
     inst->type = PLUS;
   }
@@ -572,19 +581,7 @@ Inst* inst_from_text(){
   else if (token_is_name("end")){
     inst->type = END;
   }
-  
-  else if (token_is_name("cast(int)")){
-    printf("ERROR: cast are not implemented yet.\n");
-    exit(1);
-  }
-  else if (token_is_name("cast(ptr)")){
-    printf("ERROR: cast are not implemented yet.\n");
-    exit(1);
-  }
-  else if (token_is_name("cast(bool)")){
-    printf("ERROR: cast are not implemented yet.\n");
-    exit(1);
-  }         	         
+  	         
   else if (token_is_name("return")){
     inst->type = PROC_RETURN; 
   }    
@@ -666,7 +663,7 @@ void extend_import(gfsl_vr* vr){
     printf("[DEV-NOTE]: %s is already imported.\n", file_path);
   }
   else {
-    printf("[DEV-note]: %s will be included.\n", file_path);
+    printf("[DEV-NOTE]: %s will be included.\n", file_path);
     {
       const char* before_fcontent = stream;
       IMPORT_push(file_path);
@@ -676,7 +673,88 @@ void extend_import(gfsl_vr* vr){
     }
   }
 }
+void extend_proc_body(PROC* proc){
+  current_proc = proc;
+  MustExpect(TOKEN_OPEN_C_PAREN);
+  
+  size_t prev[GFSL_PROGRAM_CAPACITY];
+  size_t prev_size = 0;
+  while(*stream  and !is_token(TOKEN_CLOSE_C_PAREN)){
+    Inst* inst = inst_from_text();
+    if(inst){      
+      // Test for forbidden inlinable stuff
+      if(proc->is_inline){
+	if(is_op_type_inline_context_forbiden(inst->type)){
+	  fprintf(stderr,
+		  "ERROR: the Op '%s' is forbiden in inline procedure context.\n",
+		  human_op_type(inst->type));
+	  exit(1);
+	}
+      }
+      // Do some little cross-reference
+      if(
+	    inst->type == Op_type::IF
+	 or inst->type == Op_type::WHILE
+	 or inst->type == Op_type::DO	    
+	 )
+	{
+	  prev[prev_size++] = proc->body_size;
+	}
+      if(inst->type == Op_type::END){
+	// TODO: better compiler error msg here
+	assert(prev_size >= 2);
+	size_t pre_end_pos = prev[--prev_size];
+	size_t pre_do_pos  = prev[--prev_size];
+	
+	Inst*  pre_end    = &proc->body[pre_end_pos];
+	Inst*  pre_do     = &proc->body[pre_do_pos];
+	
+	if(pre_do->type == Op_type::IF){
+	  printf("CROSS REFERENCE OF IF.\n");
+	  pre_end->operand = proc->body_size + 1;
+	  inst->operand    = pre_end->operand;
+	}
+	else if (pre_do->type == Op_type::WHILE){
+	  pre_end->operand = proc->body_size + 1;
+	  inst->operand    = pre_do_pos;
+	}
+	else{
+	  fprintf(stderr,
+		  "ERROR: keyword 'end' can only close 'do' or 'while' blocks.\n");
+	  exit(1);
+	}
+		
+      }
+      if(inst->type == Op_type::EXTEND_MACRO){
+	MACRO macro = macros.macros[inst->operand];
+	for(size_t i=0; i < macro.body_size; ++i){
+	  proc->body[proc->body_size++] = macro.body[i];
+	}
+	next_token();
+      }
+      else {
+	proc->body[proc->body_size++] = *inst;      
+	next_token();
+      }
+    }
+  }
+  if(1){
+    printf("| CROSS REFERENCE '%s'|\n", proc->name);
+    for(size_t i=0; i<proc->body_size; ++i){
+      printf("%zu: INST[%s]\n", i, human_inst(proc->body[i]));
+    }
 
+  }
+
+  if(!*stream){
+    fprintf(stderr,
+	    "ERROR: expected end of the procedure but got EOF.\n");
+
+  }
+  
+  MustExpect(TOKEN_CLOSE_C_PAREN);
+  current_proc = NULL;
+}
 void extend_proc(bool inlinable){
   PROC proc = {};
   
@@ -691,7 +769,7 @@ void extend_proc(bool inlinable){
   if(!is_token(TOKEN_OPEN_C_PAREN)){
     while(!is_token(TOKEN_DOUBLE_DOT) and !is_token(TOKEN_OPEN_C_PAREN)){
       assert(token.kind == TOKEN_NAME);
-      Type arg = Type_from_text(token.name);
+      GType arg = Type_from_text(token.name);
       
       assert(proc.args.stack_size < GFSL_TYPESTACK_CAP);      
       proc.args.stack[proc.args.stack_size++] = arg;
@@ -707,7 +785,7 @@ void extend_proc(bool inlinable){
   if(expect_token(TOKEN_DOUBLE_DOT)){
     while(!is_token(TOKEN_OPEN_C_PAREN)){
       assert(token.kind == TOKEN_NAME);
-      Type ret = Type_from_text(token.name);
+      GType ret = Type_from_text(token.name);
       
       assert(proc.ret.stack_size < GFSL_TYPESTACK_CAP);
       proc.ret.stack[proc.ret.stack_size++] = ret;
@@ -720,92 +798,11 @@ void extend_proc(bool inlinable){
     printf("ERROR: the 'main' procedure does not return any argument.\n");
     exit(1);
   }
-
-  MustExpect(TOKEN_OPEN_C_PAREN);
-  current_proc = &proc;  
-  size_t  prev[GFSL_PROGRAM_CAPACITY];
-  size_t  prev_size = 0;
-
-  while(*stream  and !is_token(TOKEN_CLOSE_C_PAREN)){
-    Inst* inst = inst_from_text();
-
-    if(inst){
-      if(inst->type == Op_type::IF or inst->type == Op_type::WHILE){
-	prev[prev_size++] = proc.body_size;
-      }
-
-      if(inst->type == Op_type::DO){
-	prev[prev_size++] = proc.body_size;
-      }
-      if(inst->type == Op_type::END){
-	if(prev_size < 2){
-	  fprintf(stderr,
-		  "SyntaxError: undefined behavior of 'do' keyword.\n");
-	  exit(1);
-	}
-	size_t pre_end_pos = prev[--prev_size];
-	size_t pre_do_pos  = prev[--prev_size];
-	Inst* pre_do  = &proc.body[pre_do_pos];
-	Inst* pre_end = &proc.body[pre_end_pos];
-	if(pre_do->type == Op_type::IF){
-	  // if pre_do == IF
-	  assert(pre_end->type == Op_type::DO);
-	  pre_end->operand = proc.body_size + 1;
-	  inst->operand    = proc.body_size + 1;
-	  // if 1 do
-	  // end	  
-	}
-	else if(pre_do->type == Op_type::WHILE){
-	  assert(pre_end->type == Op_type::DO);
-	  // pre_do   == WHILE
-	  // pre_end  == DO
-	  // inst     == END
-	  pre_end->operand = proc.body_size + 2;
-	  inst->operand = pre_do_pos;
-	}
-	else {
-	  fprintf(stderr,
-		  "ERROR: end can only close 'if' or 'while' blocks.\n");
-	  exit(1);
-	}
-      }
-      if(proc.is_inline){
-	if(is_op_type_inline_context_forbiden(inst->type)){
-	  fprintf(stderr,
-		  "ERROR: the Op '%s' is forbiden in inline procedure context.\n",
-		  human_op_type(inst->type));
-	  exit(1);
-	}
-      }
-      proc.body[proc.body_size++] = *inst;      
-      next_token();
-    }    
-  }
-  if(prev_size != 0){
-    fprintf(stderr,
-	    "ERROR: found an unclosed block.\n"
-	    "TODO:  print the localization of the block.\n");
     
-    exit(1);
-  }
-  if(0){
-    printf("| CROSS REFERENCE '%s'|\n", proc.name);
-    for(size_t i=0; i<proc.body_size; ++i){
-      printf("INST[%s]\n", human_inst(proc.body[i]));
-    }
-
-  }
-
-  if(!*stream){
-    fprintf(stderr,
-	    "ERROR: expected end of the procedure but got EOF.\n");
-
-  }
-  
-  MustExpect(TOKEN_CLOSE_C_PAREN);
-
+  extend_proc_body(&proc);
+    
   PROCS_push(proc);
-  current_proc = NULL;
+  
   
 }
 void gfsl_from_text(gfsl_vr* vr, const char* text){
@@ -828,20 +825,16 @@ void gfsl_from_text(gfsl_vr* vr, const char* text){
 	fprintf(stderr,
 		"ERROR: wrong use of inline, in import declaration.\n");
 	exit(1);
-      }
-      
+      }      
       extend_import(vr);
     }
     else if (token_is_name("proc")){
       extend_proc(inlinable);       
     }
     else {
-
-      Inst* inst = inst_from_text();
-      if(inst){
-	GFSL_PUSH_INST(inst->type, inst->operand);	 
+      if(inst_from_text()){
 	next_token();
-      }
+      }            
     }
   } 
 }
@@ -904,18 +897,18 @@ void generate_header(FILE* stream){
   fprintf(stream, "global _start\n");
   fprintf(stream, "segment .text\n");	
 }
-size_t macro_offset = 0;
+
 void gfsl_compile_inst(FILE* stream, Inst inst){  
   make_label(inst);
   
   switch(inst.type){
   case Op_type::PUSH_INT:
-    fprintf(stream, "\tpush %lu\n", inst.operand);
+    fprintf(stream, "\tpush %zu\n", inst.operand);
     break;
   case Op_type::PUSH_PTR:
     if(inst.operand > 0){
       fprintf(stream, "\tmov rax, buffer\n");
-      fprintf(stream, "\tadd rax, %lu\n", inst.operand);
+      fprintf(stream, "\tadd rax, %zu\n", inst.operand);
       fprintf(stream, "\tpush rax\n");
     }
     else {
@@ -927,13 +920,21 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
     fprintf(stream, "\tadd rax, %zu\n", inst.operand);
     fprintf(stream, "\tpush rax\n");      
   } break;
+  case Op_type::PUSH_EA_LOCAL_PTR: {
+    fprintf(stream, "\tlea rax, [ret_stack_rsp]\n");
+    fprintf(stream, "\tadd rax, %zu\n", inst.operand);
+    fprintf(stream, "\tpush rax\n"); 
+  } break;
   case PUSH_STATIC_PTR: {
-    fprintf(stream, "\tpush _STATIC%zu\n", inst.operand);
+    fprintf(stream, "\tpush GVar%zu\n", inst.operand);
     break;
   }
   case Op_type::PUSH_STR:
     fprintf(stream, "\tpush %zu\n", strlen(global_data.str[inst.operand]));
-    fprintf(stream, "\tpush STR%zu\n", inst.operand);
+    fprintf(stream, "\tpush Data%zu\n", inst.operand);
+    break;
+  case Op_type::PUSH_CSTR:
+    fprintf(stream, "\tpush Data%zu\n", inst.operand);
     break;
   case Op_type::DUP: {
     fprintf(stream, "\tpop rax\n");
@@ -1059,6 +1060,11 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
     fprintf(stream, "\tpop rax\n");
     fprintf(stream, "\tmov [rax], rbx\n");
   } break;
+  case Op_type::RSTORE64: {
+    fprintf(stream, "\tpop rbx\n");
+    fprintf(stream, "\tpop rax\n");
+    fprintf(stream, "\tmov [rbx], rax\n");
+  } break;
   case Op_type::LOAD8: {
     fprintf(stream, "\tpop rax\n");
     fprintf(stream, "\txor rbx, rbx\n");
@@ -1074,13 +1080,13 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
   } break;
   case Op_type::IF: break;
   case Op_type::WHILE: break;
-  case Op_type::DO: {
+  case Op_type::DO:{
     fprintf(stream, "\tpop rax\n");
     fprintf(stream, "\ttest rax, rax\n");
-    fprintf(stream, "\tjz .L%zu\n", inst.operand + macro_offset);
+    fprintf(stream, "\tjz .L%zu\n", inst.operand);
   } break;
   case Op_type::END: {
-    fprintf(stream, "\tjmp .L%zu\n", inst.operand + macro_offset);    
+    fprintf(stream, "\tjmp .L%zu\n", inst.operand);    
   } break; 
   case Op_type::DUMP:
     fprintf(stream, "\tpop rdi\n");
@@ -1093,9 +1099,8 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
 	    macro.body_size);
     {
 
-      for(size_t i=0; i < macro.body_size; ++i){	
+      for(size_t i=0; i < macro.body_size; ++i){
 	gfsl_compile_inst(stream, macro.body[i]);
-	macro_offset++;
       }
     }
     fprintf(stream, "\t;;END MACRO: %s\n", macro.name);
@@ -1108,7 +1113,6 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
 
       for(size_t i=0; i< procedure.body_size; ++i){
 	gfsl_compile_inst(stream, procedure.body[i]);
-	macro_offset++;
       }
       fprintf(stream, "\t;;end of inline procedure %s\n", procedure.name);
     }      
@@ -1137,6 +1141,20 @@ void gfsl_compile_inst(FILE* stream, Inst inst){
     fprintf(stream, "\tcmovl rcx, rdx\n");
     fprintf(stream, "\tpush rcx\n");
 
+  } break;
+  case Op_type::EQUALS: {
+    fprintf(stream, "\tmov rcx, 0\n");
+    fprintf(stream, "\tmov rdx, 1\n");
+    fprintf(stream, "\tpop rax\n");
+    fprintf(stream, "\tpop rbx\n");
+    fprintf(stream, "\tcmp rax,rbx\n");
+    fprintf(stream, "\tcmove rcx, rdx\n");
+    fprintf(stream, "\tpush rcx\n");
+  } break;
+  case Op_type::NOT: {
+    fprintf(stream, "\tpop rax\n");
+    fprintf(stream, "\tnot rax\n");
+    fprintf(stream, "\tpush rax\n");    
   } break;
   case Op_type::DUMP_STACK:
   case Op_type::CAST_INT:
@@ -1167,7 +1185,6 @@ void gfsl_compile_procs(FILE* stream){
       for(size_t j=0; j < proc.body_size; ++j){
 	gfsl_compile_inst(stream, proc.body[j]);
       }
-      macro_offset = 0;
       make_ret_label(proc.name);
       fprintf(stream, "\tmov rax, rsp\n");
       fprintf(stream, "\tmov rsp, [ret_stack_rsp]\n");
@@ -1188,7 +1205,6 @@ void gfsl_compile_program(gfsl_vr* vr, const char* output_filepath){
   for(size_t i=0; i < vr->program_size; ++i){
     gfsl_compile_inst(stream, vr->program[i]);
   }
-  macro_offset = 0;
   gfsl_compile_procs(stream);
   {
     int main_loc = PROCS_pos("main");
@@ -1210,9 +1226,13 @@ void gfsl_compile_program(gfsl_vr* vr, const char* output_filepath){
   if(global_data.str_size > 0){
     fprintf(stream, "segment .data\n");
     for(size_t strloc=0; strloc < global_data.str_size; ++strloc){
-      fprintf(stream, "STR%zu: db \"%s\", 0\n",
-	      strloc,
-	      global_data.str[strloc]);
+      fprintf(stream, "Data%zu: db ",
+	      strloc);
+      char* str = (char*)global_data.str[strloc];
+      for(size_t i=0; i < buf__len(str); ++i){
+	fprintf(stream, "%i, ", str[i]);
+      }
+      fprintf(stream, "\n");
     }
     
   }
@@ -1224,11 +1244,29 @@ void gfsl_compile_program(gfsl_vr* vr, const char* output_filepath){
   fprintf(stream, "ret_stack_end: resq 1 \n");
   
   for(size_t staticloc=0; staticloc<static_memory.statics_size; staticloc++){
-    fprintf(stream, "_STATIC%zu: resb %zu\n",
+    fprintf(stream, "GVar%zu: resb %zu\n",
 	    staticloc,
 	    static_memory.statics[staticloc].size);
   }
   fclose(stream);
 }
 
+
+void gfsl_cross_reference(gfsl_vr* vr){
+  (void) vr;
+  printf("[DEV-NOTE]: TODO: gfsl_extend_macros\n");
+}
+void compile_asm_to_binary(const char* fp){
+  char buffer[258];
+#define CMD(...)				\
+  sprintf(buffer, __VA_ARGS__);			\
+  printf("[CMD]: %s\n", buffer);		\
+  system(buffer);
+  
+  const char* trash = "__TRASH__.o";
+  CMD("nasm -felf64 %s -o %s", fp, trash);
+  CMD("ld %s -o %s.bin", trash, fp);
+  CMD("rm %s", trash);
+#undef CMD
+}
 #endif /*  __gfsl */

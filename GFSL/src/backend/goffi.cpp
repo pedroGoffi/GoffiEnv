@@ -271,13 +271,7 @@ namespace Goffi{
       case OP_LTHAN:
 	makeLabel;
 	out
-	    <<  "   mov rcx, 0\n"
-	    <<  "   mov rdx, 1\n"
-	    <<  "   pop rbx\n"
-	    <<  "   pop rax\n"
-	    <<  "   cmp rax, rbx\n"
-	    <<  "   cmovl rcx, rdx\n"
-	    <<  "   push rcx\n"
+
 	  ;
 	++ip;
 	break;

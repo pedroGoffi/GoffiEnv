@@ -73,7 +73,34 @@ char escape_to_char(char c){
   default:  return 0;    
   }
 }
-
+char unescape_to_char(char c){
+  switch(c){
+  case '\n': return 'n';
+  case '\r': return 'r';
+  case '\t': return 't';
+  case '\v': return 'v';
+  case '\b': return 'b';
+  case '\a': return 'a';
+  default:  return 0;    
+  }
+}
+const char* unescape_string(const char* str){
+  char* buf = NULL;
+  for(size_t i=0; i < buf__len(str);  ++i){
+    char c   = str[i];
+    char unc = unescape_to_char(c);
+    
+    if(unc == 0){
+      buf__push(buf, c);
+    }
+    else {
+      buf__push(buf, '\\');
+      buf__push(buf, unc);
+      
+    }
+  }
+  return buf;
+}
 void lexer_scan_char(){
   assert(*stream == '\'');
   stream++;

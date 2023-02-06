@@ -1,4 +1,4 @@
-algoritmo main(){
+func main(){
   var f0: i64;
   var f1: i64 = 1;
   var f2: i64;

@@ -1,0 +1,30 @@
+GENERATE_ASM :: 1
+
+func cmd_shift(argc: *i64, argv: ***char): const *char
+{
+  assert(*argc > 0);
+  var r: const *char = **argv;
+  *argv += 1;
+  *argc -= 1;
+  retorne r;
+}
+func usage(stream: *FILE, program: const *char){}
+func main(argc: i64, argv: **char): i64
+{
+  var program: const *char = cmd_shift(&argc, &argv);
+  se argc == 0{
+    usage(stderr, program);
+    fprintf(stderr, "ERROR: expected file path.");
+    exit(1);
+  }
+  
+  var input_fp:  *char;//argv[0];
+  var output_fp: const *char   = "out.asm";
+  var compiler_mode: i64 = GENERATE_ASM;
+  enquanto argc {
+    var flag: const *char = cmd_shift(&argc, &argv);
+    printf("%s\n", flag);
+  }
+}
+
+

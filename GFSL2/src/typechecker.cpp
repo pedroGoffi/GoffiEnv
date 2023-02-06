@@ -13,7 +13,7 @@ void dump_type_stack(TypeStack* ts, const char* str){
   }
   printf("]\n");
 }
-void TypeStack_push(TypeStack* ts, Type type){
+void TypeStack_push(TypeStack* ts, GType type){
   assert(ts->stack_size < GFSL_TYPESTACK_CAP);
   ts->stack[ts->stack_size++] = type;
 }
@@ -28,20 +28,20 @@ bool expect_stack(TypeStack ts, TypeList tl){
   return true;
   
 }
-inline Type TypeStack_back(TypeStack* ts){
+inline GType TypeStack_back(TypeStack* ts){
   return ts->stack[ts->stack_size - 1];
 }
-Type TypeStack_offset(TypeStack* ts, size_t i){
+GType TypeStack_offset(TypeStack* ts, size_t i){
   assert(i < ts->stack_size);
   return ts->stack[i];
 }
-Type TypeStack_pop(TypeStack* ts){
-  Type res = ts->stack[ts->stack_size - 1];
+GType TypeStack_pop(TypeStack* ts){
+  GType res = ts->stack[ts->stack_size - 1];
   ts->stack_size--;
   return res;
 }
-Type* TypeStack_reverse(TypeStack ts){
-  Type* tmp = NULL;
+GType* TypeStack_reverse(TypeStack ts){
+  GType* tmp = NULL;
   for(size_t i=0; i < ts.stack_size; ++i){
     buf__push(tmp, TypeStack_pop(&ts));
   }
@@ -60,7 +60,7 @@ bool TypeStack_pop_count(TypeStack* ts, size_t pop_count){
   }
   return true;
 }
-inline bool expect_type(TypeStack* tstack, Type type){
+inline bool expect_type(TypeStack* tstack, GType type){
   if(tstack->stack[tstack->stack_size - 1] != type){
     return false;
   }
@@ -79,13 +79,13 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 #define CASE_TODO(x) case x: printf("[TODO]: typecheck %s.\n", #x); break;
   switch(inst.type){
     CASE(PUSH_INT, {
-	TypeStack_push(ts, TYPE_INT);});
+	TypeStack_push(ts, GTYPE_INT);});
     CASE(DUMP, {
 	if(!expect_arity(ts, 1)){
 	  error("Intrisic 'dump' require one element in the stack.\n");
 	}
-	Type a = TypeStack_pop(ts);
-	if(a != TYPE_INT){
+	GType a = TypeStack_pop(ts);
+	if(a != GTYPE_INT){
 	  fprintf(stderr,
 		  "ERROR: expected 'int' for dump instrisic.\n");
 	  exit(1);
@@ -98,44 +98,60 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	TypeStack_pop(ts);
       });
     CASE(PUSH_STR, {
-	TypeStack_push(ts, TYPE_INT);
-	TypeStack_push(ts, TYPE_PTR);
+	TypeStack_push(ts, GTYPE_INT);
+	TypeStack_push(ts, GTYPE_PTR);
       });
     CASE(MEM, {
-	TypeStack_push(ts, TYPE_PTR);
+	TypeStack_push(ts, GTYPE_PTR);
       });
     CASE(PUSH_PTR, {
-	TypeStack_push(ts, TYPE_PTR);
+	TypeStack_push(ts, GTYPE_PTR);
       });
     CASE(PUSH_STATIC_PTR, {
-	TypeStack_push(ts, TYPE_PTR);
+	TypeStack_push(ts, GTYPE_PTR);
       });
     CASE(PUSH_LOCAL_PTR, {
-      	TypeStack_push(ts, TYPE_PTR);
+      	TypeStack_push(ts, GTYPE_PTR);
       });
     CASE(PLUS, {
 	if(!expect_arity(ts, 2)){
 	  error("Intrisic [PLUS, '+'], requires two elements in the stack.\n");
 	}
-	Type a = TypeStack_pop(ts);
-	Type b = TypeStack_pop(ts);
-	if(a == TYPE_PTR and b == TYPE_PTR){
+	GType a = TypeStack_pop(ts);
+	GType b = TypeStack_pop(ts);
+	if(a == GTYPE_PTR and b == GTYPE_PTR){
 	  fprintf(stderr,
 		  "Intrisic [PLUS, '+'] works with +(ptr, data) but not with +(ptr, ptr).\n");
 	  exit(1);
 	}
-	else if(a == TYPE_PTR or b == TYPE_PTR){
-	  TypeStack_push(ts, TYPE_PTR);
+	else if(a == GTYPE_PTR or b == GTYPE_PTR){
+	  TypeStack_push(ts, GTYPE_PTR);
 	}
 	else {
-	  TypeStack_push(ts, TYPE_INT);
+	  TypeStack_push(ts, GTYPE_INT);
+	}
+      });
+    CASE(MINUS, {
+	if(!expect_arity(ts, 2)){
+	  error("Intrisic [MINUS, '-'], requires two elements in the stack.\n");
+	}
+	GType a = TypeStack_pop(ts);
+	GType b = TypeStack_pop(ts);
+	if(a == GTYPE_PTR and b == GTYPE_PTR){
+	  TypeStack_push(ts, GTYPE_PTR);
+	}
+	else if(a == GTYPE_PTR or b == GTYPE_PTR){
+	  TypeStack_push(ts, GTYPE_PTR);
+	}
+	else {
+	  TypeStack_push(ts, GTYPE_INT);
 	}
       });
     CASE(DUP, {
 	if(!expect_arity(ts, 1)){
 	  error("Intrisic 'dup', equires one elements in the stack.\n");
 	}
-	Type a = TypeStack_pop(ts);
+	GType a = TypeStack_pop(ts);
 	TypeStack_push(ts, a);
 	TypeStack_push(ts, a);	  
       });
@@ -164,24 +180,46 @@ void typecheck_inst(TypeStack* ts, Inst inst){
     CASE_TODO(PROC_ENTRY);
     CASE_TODO(PROC_RETURN);
     CASE_TODO(PROC_LEAVE);
-    CASE_TODO(MINUS);
+
     CASE_TODO(DIVMOD);
     CASE_TODO(IDIVMOD);
-    CASE_TODO(EQUALS);
+    CASE(EQUALS, {
+	if(!expect_arity(ts, 2)){
+	  error("Intrisic '==', requires two elements in the stack.\n");
+	}
+	TypeStack_pop(ts);
+	TypeStack_pop(ts);
+	TypeStack_push(ts, GTYPE_BOOL);	
+      });
     CASE_TODO(NOT_EQUALS);
-    CASE_TODO(MULT);
+    CASE(MULT,{
+	if(!expect_arity(ts, 2)){
+	  error("Intrisic [MULT, '*'], requires two elements in the stack.\n");
+	}
+	GType a = TypeStack_pop(ts);
+	GType b = TypeStack_pop(ts);
+	if(a == GTYPE_PTR and b == GTYPE_PTR){
+	  error("Intrisic '*' works with ptr*data or data*data\n");
+	}
+	else if (a == GTYPE_PTR or b == GTYPE_PTR){
+	  TypeStack_push(ts, GTYPE_PTR);
+	}
+	else {
+	  TypeStack_push(ts, GTYPE_INT);
+	}
+      });
     CASE_TODO(GTHAN);
     CASE_TODO(LTHAN);    
-    CASE(ARGC, {});
-    CASE(ARGV, {});
+    CASE(ARGC, {TypeStack_push(ts, GTYPE_PTR);});
+    CASE(ARGV, {TypeStack_push(ts, GTYPE_PTR);});
 
     CASE_TODO(OVER); 
     CASE(SWAP, {
 	if(!expect_arity(ts, 2)){
-	  error("Intrisic 'swap', equires one elements in the stack.\n");
+	  error("Intrisic 'swap', requires two elements in the stack.\n");
 	}
-	Type a = TypeStack_pop(ts);
-	Type b = TypeStack_pop(ts);
+	GType a = TypeStack_pop(ts);
+	GType b = TypeStack_pop(ts);
 	TypeStack_push(ts, a);
 	TypeStack_push(ts, b);	
       }); 
@@ -190,7 +228,16 @@ void typecheck_inst(TypeStack* ts, Inst inst){
     CASE_TODO(SHR);
     CASE_TODO(OR);
     CASE_TODO(AND);
-    CASE_TODO(NOT);
+    CASE(NOT, {
+	if(!expect_arity(ts, 1)){
+	  error("Intrisic 'not', requires one elements in the stack.\n");
+	}
+	GType a = TypeStack_pop(ts);
+	if(a != GTYPE_BOOL){
+	  error("keyword NOT expects boolean on the top of the stack.\n");
+	}
+	TypeStack_push(ts, GTYPE_BOOL);
+      });
     CASE_TODO(CAST);
     CASE_TODO(IF);
     CASE_TODO(ELSE);
@@ -199,11 +246,11 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	if(!expect_arity(ts, 1)){
 	  error("Intrisic 'do' requires 1 elements in the stack.\n");
 	}
-	Type a = TypeStack_pop(ts);
-	if(a != TYPE_BOOL){
+	GType a = TypeStack_pop(ts);
+	if(a != GTYPE_BOOL){
 	  fprintf(stderr,
 		  "ERROR: 'do' blocks expect %s on the top of the stack, but got '%s'\n",
-		  Type_cstr(TYPE_BOOL),
+		  Type_cstr(GTYPE_BOOL),
 		  Type_cstr(a));
 	  exit(1);
 	}
@@ -214,7 +261,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	  error("Intrisic 'syscall0' requires 1 elements in the stack.\n");
 	}
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       }); 
     CASE(SYSCALL1, {
 	if(!expect_arity(ts, 2)){
@@ -222,7 +269,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	}
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
     CASE(SYSCALL2, {
 	if(!expect_arity(ts, 3)){
@@ -231,7 +278,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
     CASE(SYSCALL3, {
 	if(!expect_arity(ts, 4)){
@@ -241,7 +288,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
     CASE(SYSCALL4, {
 	if(!expect_arity(ts, 5)){
@@ -252,7 +299,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);	  
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
     CASE(SYSCALL5, {
 	if(!expect_arity(ts, 6)){
@@ -266,7 +313,7 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	TypeStack_pop(ts);
 	TypeStack_pop(ts);
 	
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
     CASE(SYSCALL6, {
 	if(!expect_arity(ts, 7)){
@@ -282,22 +329,35 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 
 	TypeStack_pop(ts);
 	
-	TypeStack_push(ts, TYPE_INT);	  
+	TypeStack_push(ts, GTYPE_INT);	  
       });
-    CASE_TODO(LOAD8);
+    CASE(LOAD8, {
+	if(!expect_arity(ts, 1)){
+	  printf("todo document this\n");
+	  exit(1);
+	}
+	GType ptr = TypeStack_pop(ts);
+	if(ptr != GTYPE_PTR){
+	  error("Intrisic load8 expect '%s', but got '%s'\n",
+		Type_cstr(GTYPE_PTR),
+		Type_cstr(ptr));
+	  exit(1);
+	}
+	TypeStack_push(ts, GTYPE_INT);
+      });
     CASE(LOAD64,{
 	if(!expect_arity(ts, 1)){
 	  printf("todo document this\n");
 	  exit(1);
 	}
-	Type ptr = TypeStack_pop(ts);
-	if(ptr != TYPE_PTR){
+	GType ptr = TypeStack_pop(ts);
+	if(ptr != GTYPE_PTR){
 	  error("Intrisic load expect '%s', but got '%s'\n",
-		Type_cstr(TYPE_PTR),
+		Type_cstr(GTYPE_PTR),
 		Type_cstr(ptr));
 	  exit(1);
 	}
-	TypeStack_push(ts, TYPE_INT);
+	TypeStack_push(ts, GTYPE_INT);
       });  
     CASE_TODO(STORE8);
     CASE(STORE64, {
@@ -305,16 +365,17 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	  printf("todo document this\n");
 	  exit(1);
 	}
-	Type Data = TypeStack_pop(ts);
-	Type Dst  = TypeStack_pop(ts);
-	//if(Dst != TYPE_PTR){
-	//  printf("ERROR: 	if(Dst != TYPE_PTR)\n");
-	//  exit(1);
-	//}
+	GType Data = TypeStack_pop(ts);
+	GType Dst  = TypeStack_pop(ts);
+	if(Dst != GTYPE_PTR){
+	  error("Intrisic load expects a pointer to be the second element on the stack, got '%s'.\n",
+	        Type_cstr(Dst));
+	}
 	(void) Data;
 	(void) Dst;
       });
     CASE(EXTEND_MACRO, {
+	// TODO: get rid of this section
 	MACRO macro = macros.macros[inst.operand];
 	for(size_t i=0; i < macro.body_size; ++i){
 	  Inst macro_inst = macro.body[i];
@@ -325,32 +386,32 @@ void typecheck_inst(TypeStack* ts, Inst inst){
 	if(!expect_arity(ts, 1)){
 	  fprintf(stderr,
 		  "ERROR: expected at least one element on the stack for casting to '%s'.\n",
-		  Type_cstr(TYPE_INT));
+		  Type_cstr(GTYPE_INT));
 	  exit(1);
 	}
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_INT);	
+	TypeStack_push(ts, GTYPE_INT);	
       });
     CASE(CAST_PTR, {
 	if(!expect_arity(ts, 1)){
 	  fprintf(stderr,
 		  "ERROR: expected at least one element on the stack for casting to '%s'.\n",
-		  Type_cstr(TYPE_PTR));
+		  Type_cstr(GTYPE_PTR));
 	  exit(1);
 	}
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_PTR);
+	TypeStack_push(ts, GTYPE_PTR);
 
       })
      CASE(CAST_BOOL, {
 	if(!expect_arity(ts, 1)){
 	  fprintf(stderr,
 		  "ERROR: expected at least one element on the stack for casting to '%s'.\n",
-		  Type_cstr(TYPE_BOOL));
+		  Type_cstr(GTYPE_BOOL));
 	  exit(1);
 	}
 	TypeStack_pop(ts);
-	TypeStack_push(ts, TYPE_BOOL);
+	TypeStack_push(ts, GTYPE_BOOL);
 
       })
       
@@ -387,8 +448,8 @@ void typecheck_procedure(PROC* proc){
   
   for(size_t i=0; i < proc->ret.stack_size; i++){
 
-    Type expected   = proc->ret.stack[proc->ret.stack_size - i - 1];
-    Type got        = TypeStack_pop(&ts);
+    GType expected   = proc->ret.stack[proc->ret.stack_size - i - 1];
+    GType got        = TypeStack_pop(&ts);
     if(expected != got){
       
     error("expected '%s' to be the %zu element on the top of the stack, but got '%s', on procedure '%s'\n",

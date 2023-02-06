@@ -135,7 +135,7 @@ static const char *reg_dx(int sz) {
   }
   unreachable();
 }
-static const char* word_from_size(size_t sz){
+static const char* word_from_size(size_t sz){  
   if(sz == 1) return "BYTE";
   if(sz == 2) return "WORD";
   if(sz == 4) return "DWORD";
@@ -143,6 +143,7 @@ static const char* word_from_size(size_t sz){
   return "";
 }
 static const char *reg_ax(int sz) {
+  
   switch (sz) {
   case 1: return "al";
   case 2: return "ax";

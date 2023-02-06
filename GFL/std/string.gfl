@@ -3,13 +3,13 @@ tipodata string     :: *_char
 __MAX_W_SIZE__ :: 256
 __INIT_MAX_STR__    :: "                                                                                                                                                                                                                                                                  "
 
-algoritmo strlen(str: *char): i64{
+func strlen(str: *char): i64{
   var len:    i64 = 0;
   enquanto str[len += 1]  != '\0'{}
   retorne len;
 }
 
-algoritmo streq(a: *char, b: *char): i64{
+func streq(a: *char, b: *char): i64{
   var str1: *char = a;
   var str2: *char = b;
   var s1: i64 = strlen(str1);
@@ -27,7 +27,7 @@ algoritmo streq(a: *char, b: *char): i64{
   retorne verdadeiro;
 }
 
-algoritmo stoi(str: *char): i64{
+func stoi(str: *char): i64{
   var str_begin: *char = str;
   se *str_begin == 0{
     puts("ERROR: can not convert string to integer, got NULL string.\n");
@@ -43,7 +43,7 @@ algoritmo stoi(str: *char): i64{
   retorne result; 
 }
 
-algoritmo strcat(a: *char, b:*char): *char {
+func strcat(a: *char, b:*char): *char {
   var res:  *char	= __INIT_MAX_STR__;
   var iter: *char	= res;
   var asz:  i64		= strlen(a);
@@ -64,11 +64,11 @@ algoritmo strcat(a: *char, b:*char): *char {
   retorne res;
 }
 
-algoritmo is_numeric(chr: i64): bool {
+func is_numeric(chr: i64): bool {
   retorne ('0' <= chr <= '9') como bool;
 }
 
-algoritmo is_alpha(chr: i64): bool {
+func is_alpha(chr: i64): bool {
   retorne ('a' <= chr <= 'z' ou 'A' <= chr <= 'Z') como bool;
 }
 

@@ -1,5 +1,12 @@
-algoritmo arquivo_pegar_texto(caminho: *char)
-: *char
+func streq(str_a: const *char, str_b: const *char): i64
 {
-  retorne "proc main(): void {}";
+  var sa: i64 = strlen(str_a);
+  se sa != strlen(str_b) { retorne 0; }
+  var i: i64 = 0;
+  enquanto i < sa
+  {
+    se str_a[i] != str_b[i] { retorne 0; }
+    i += 1;
+  }
+  retorne 1;
 }

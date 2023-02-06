@@ -1,7 +1,0 @@
-include "std/std.gfsl"
-
-proc main{
-  local Str 8 end
-  Str "hello" str!
-  Str str* puts
-}

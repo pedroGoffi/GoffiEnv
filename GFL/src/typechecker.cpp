@@ -304,10 +304,14 @@ void typecheck_ast(Decl** ast){
     } break;
     case DECL_PROC:
       current_proc = &node->as.procDecl;
+
+
       raise_if_typedef(&current_proc->ret_type);
       Proc_push(&procs, node);
       init_local_procedure_args(current_proc->args);
-      typecheck_block(node->as.procDecl.block);
+      if(!current_proc->block)
+	typecheck_block(node->as.procDecl.block);
+      
       current_proc = NULL;
       buf__free(local_vars);
       break;

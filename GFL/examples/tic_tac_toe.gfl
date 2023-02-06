@@ -3,7 +3,7 @@
 BLANK_CELL :: "-"
 PLAYER_A   :: "X"
 PLAYER_B   :: "O"
-algoritmo sair(valor_saida: i64) = exit(valor_saida);
+func sair(valor_saida: i64) = exit(valor_saida);
 var A0: *char = BLANK_CELL;
 var A1: *char = BLANK_CELL;
 var A2: *char = BLANK_CELL;
@@ -17,7 +17,7 @@ var C1: *char = BLANK_CELL;
 var C2: *char = BLANK_CELL;
 
 
-algoritmo pegar_cell_item_por_str(str: *char): *char{
+func pegar_cell_item_por_str(str: *char): *char{
   se   streq(str, "a0") {&A0;}
   ouse streq(str, "a1") {&A1;}
   ouse streq(str, "a2") {&A2;}
@@ -35,7 +35,7 @@ algoritmo pegar_cell_item_por_str(str: *char): *char{
   }
 }
 
-algoritmo puts_x(row: i64): i64 {
+func puts_x(row: i64): i64 {
   se row == 0 { // First row
      puts(A0);
      puts(" ");
@@ -65,7 +65,7 @@ algoritmo puts_x(row: i64): i64 {
     exit(1);
   }
 }
-algoritmo puts_y(ypos: i64) {
+func puts_y(ypos: i64) {
   se ypos == 0 {
     puts("A | ");
     puts_x(0);
@@ -77,7 +77,7 @@ algoritmo puts_y(ypos: i64) {
     puts_x(2);
   }
 } 
-algoritmo print_table(): void {
+func print_table(): void {
   puts("    0 : 1 : 2\n");
   puts("  +-----------\n");
   var pos: i64 = 0;
@@ -87,13 +87,13 @@ algoritmo print_table(): void {
   }
   
 }
-algoritmo existe_ganhador(){}
-algoritmo mostrar_ganhador(ganhador_str: *char){
+func existe_ganhador(){}
+func mostrar_ganhador(ganhador_str: *char){
   puts("O ganhador foi: ");
   puts(ganhador_str);
   puts("!!!\n");
 }
-algoritmo main(): void {
+func main(): void {
   var player:  *char = PLAYER_A ;
   var row_str: *char = 0 como *char;
   var row_ptr: *i64  = 0 como *i64;

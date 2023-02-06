@@ -1,6 +1,6 @@
 // codigo em C;  (tipo)expressao
 // codigo em gfl; expressao como tipo
-algoritmo main(){
+func main(){
   var I8:   _i8 = 10;
   var I64: _i64 = 10;
   __print__(

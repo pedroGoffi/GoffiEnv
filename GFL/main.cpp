@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 const char*  program = NULL;
+bool debug_mode      = false;
 #define LEXER_HAS_LOCATION        
 #include "../common/utils.cpp"
 #include "./src/parser.cpp"
@@ -14,12 +15,13 @@ const char*  program = NULL;
 #include "./src/C_compiler.cpp"
 #include "./src/3BC_compiler.cpp"
 
+
 enum CO_OPT{
   NONE,
   DUMP_AST,  
   GENERATE_C_CODE,
   GENERATE_ASM_CODE,
-  GENERATE_3BC_CODE
+  GENERATE_3BC_CODE,
   // UNIMPLEMENTED: SIMULATE_GFM,
 };
 void CompileAsmToBinary(const char* outfp){
@@ -43,9 +45,8 @@ int main(int argc, char** argv){
     exit(1);
   }
   const char*  input_fp  = argv[0];
-  const char*  output_fp = "out.asm";
+  const char*  output_fp = "out.c";
   enum CO_OPT  compiler_mode = CO_OPT::GENERATE_ASM_CODE;
-  bool debug_mode = false;
   // TODO: parse different args
   while(argc){    
     const char* flag = shift(&argc, &argv);
@@ -70,7 +71,7 @@ int main(int argc, char** argv){
       compiler_mode = CO_OPT::GENERATE_C_CODE;
     } else if (STR_CMP(flag, "-gen:3bc")){
       compiler_mode = CO_OPT::GENERATE_3BC_CODE;
-    }
+    } 
     else {
       input_fp = flag;
     }
@@ -78,13 +79,13 @@ int main(int argc, char** argv){
   }  
   
   
-  // TODO: order_ast without bug
+
   Decl** ast = order_ast(parse_from_file(input_fp));
   typecheck_ast(ast);
   if(debug_mode){
     print_ast(ast);
   }
-  
+  compiler_mode = GENERATE_C_CODE;
   switch(compiler_mode){
   case NONE:
   case DUMP_AST:
@@ -93,6 +94,7 @@ int main(int argc, char** argv){
     
   case GENERATE_C_CODE:
     assembly_c_ast(ast, output_fp);
+    compile_c(output_fp);
     return 0;
     
   case GENERATE_ASM_CODE:

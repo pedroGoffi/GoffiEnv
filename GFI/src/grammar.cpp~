@@ -1,0 +1,4 @@
+#ifndef __grammar
+#define __grammar
+#define "func"
+#endif /*__grammar*/

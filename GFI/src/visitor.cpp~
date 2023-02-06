@@ -1,0 +1,60 @@
+#ifndef __visitor
+#define __visitor
+#include "./ast.cpp"
+
+struct BUILTIN_PROC {
+  const char* name;
+  int (*callstr)(const char*, ...);
+};
+
+static BUILTIN_PROC built_in_procs[] = {
+  {"write", printf}
+};
+BUILTIN_PROC* PROCS_is_builtin(const char* name){
+  for(size_t i=0; i < ARRAY_SIZE(built_in_procs); ++i){
+    if(!strcmp(built_in_procs[i].name, name)){
+      return &built_in_procs[i];
+    }
+  }
+  return NULL;
+}
+namespace Visit{
+  
+  Ast::Node* node(Ast::Node* node){
+    assert(node->kind != Ast::NODE_UNDEFINED);
+    
+    if(node->kind == Ast::NODE_NUMBER){
+      return node;
+    }
+    if(node->kind == Ast::NODE_STRING){
+      return node;
+    }
+    else if (node->kind == Ast::NODE_VAR){
+      return node->rhs;
+    }
+    else if (node->kind == Ast::NODE_BINARY){
+      assert(node->lhs && node->rhs);
+      Ast::Node* lhs = Visit::node(node->lhs);
+      Ast::Node* rhs = Visit::node(node->rhs);
+      assert(lhs->kind == Ast::NODE_NUMBER and rhs->kind == Ast::NODE_NUMBER);
+      lhs->token.INT += rhs->token.INT;
+      return lhs;
+    }
+    else if (node->kind == Ast::NODE_CALL){      
+      Ast::Node* arg = Visit::node(node->rhs);
+      if(BUILTIN_PROC* bp = PROCS_is_builtin(node->name)){
+	if(bp->callstr){
+	  (*bp->callstr)(arg->token.STRING);
+	}
+      }
+      else {
+	printf("Error: o procedimento %s, não foi declarado neste escopo.\n.\n", node->name);
+      }
+      return 0;
+    }
+    printf("visitor error %zu:\n",
+	   (size_t)node->kind);
+    return node;
+  }
+}
+#endif /*__visitor*/

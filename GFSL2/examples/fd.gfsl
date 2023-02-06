@@ -1,0 +1,8 @@
+import "std/std.gfsl"
+import "std/file.gfsl"
+
+proc main{
+  local fd 8 end fd 0 store
+  
+  O_READONLY 1 nth-argv fopen
+}

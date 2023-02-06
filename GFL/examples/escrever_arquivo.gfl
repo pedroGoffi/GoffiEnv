@@ -1,14 +1,14 @@
 #incluir "std/padrao.gfl"
 
 
-algoritmo programa_uso(fd: i64, program: *char)
+func programa_uso(fd: i64, program: *char)
 {
   putsf(fd, "USO:\n");
   putsf(fd, program);
   putsf(fd, " INPUT_FP TEXTO\n");
 }
 
-algoritmo main(argc: i64, argv: **char)
+func main(argc: i64, argv: **char)
 {  
   // file descriptor
   se argc != 3

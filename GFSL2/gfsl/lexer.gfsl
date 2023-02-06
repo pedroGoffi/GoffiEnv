@@ -1,0 +1,5 @@
+//static stream 16 end
+static stream 16 end
+proc init-stream int ptr {
+  drop drop
+}

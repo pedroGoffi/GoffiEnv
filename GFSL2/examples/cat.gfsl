@@ -6,7 +6,16 @@ proc main {
    local fd        8 end
 
 
-   fd O_READONLY 1 nth-argv fopen
+   //fd O_READONLY 1 nth-argv fopen
+   
+
+   fd
+    O_READONLY
+    1 nth-argv load
+    AT_FDCWD
+    openat
+   store
+   
    drop
    // fd = fopen(argv[1])
    fd get-file-text puts

@@ -1,0 +1,5 @@
+import "std/std.gfsl"
+import "std/string.gfsl"
+
+proc main int{
+}

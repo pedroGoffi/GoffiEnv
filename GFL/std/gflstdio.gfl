@@ -2,13 +2,13 @@
 #incluir "std/errno.gfl"
 
 
-algoritmo sys_write(
+func sys_write(
   fd: i64,
   ptr: *void,
   len: i64)
 : i64 = retorne SYSCALL3(fd, ptr, len, SYS_write) como i64;
 
-algoritmo fwrite(
+func fwrite(
     fd:  i64,
     ptr: *char,
     len: i64
@@ -27,14 +27,14 @@ algoritmo fwrite(
   }
 }
 
-algoritmo putsf(fd: i64, str: *char) {
+func putsf(fd: i64, str: *char) {
   var str_len: i64 = strlen(str) se str senao 0;
   fwrite(fd, str, str_len);
 }
 
-algoritmo puts(str: *char) = putsf(stdout, str);
+func puts(str: *char) = putsf(stdout, str);
 
-algoritmo input(msg: *char): *char{
+func input(msg: *char): *char{
   puts(msg);
   // TODO: make arrays for god sake
   var res: *char  = __INIT_MAX_STR__;

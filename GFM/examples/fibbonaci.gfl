@@ -1,0 +1,7 @@
+#string msg "hello, world!\n"
+#define stdout 0
+#entry run:
+  push_str msg
+  push     stdout
+  native   write
+  halt

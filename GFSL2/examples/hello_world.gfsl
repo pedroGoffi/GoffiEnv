@@ -1,0 +1,5 @@
+import "std/std.gfsl"
+
+proc main {
+  "Hello, world!\n" puts
+}

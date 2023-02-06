@@ -19,6 +19,7 @@ macro fopen
 //  ptr // -- FILE* destination
 //  ptr // -- char* file path
 //{
+  //O_READ path
   load AT_FDCWD openat store
 end
 
@@ -51,15 +52,14 @@ proc get-file-text ptr: int ptr
   
   // ... int ptr
 }
-//proc cat 
-//ptr // ... ptr
-//{
-//  local fd        8 end
-//  local file_path 8 end   
-//  file_path swap store  
-//  fd O_READONLY file_path load cast-ptr fopen  
-//  fd get-file-text puts
-//  drop
-//// ... void
-//}
-//
+proc cat 
+ptr // ... fd
+{
+  local fd        8 end
+  local file_path 8 end   
+  file_path swap load store
+  
+  fd O_READONLY file_path fopen
+  fd get-file-text puts
+}
+

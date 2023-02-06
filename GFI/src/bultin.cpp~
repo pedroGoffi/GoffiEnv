@@ -1,0 +1,14 @@
+#ifndef __builtin
+#define __builtin
+namespace Builtin {
+  static const char* builtin_names[] = {
+    "write"
+  };
+  const bool is_proc(const char* name){
+    for(const char* bn: builtin_names){
+      if(!strcmp(bn, name)) return true;
+    }
+    return false;
+  }
+}
+#endif /*__builtin*/

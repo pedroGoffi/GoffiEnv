@@ -46,7 +46,7 @@ typedef struct BufHdr{
   char   buf[1]; // NOTE: if the allocator buggy, change the array size to zero  
 } BufHdr;
 
-#define BUF_SIZE_MAX 1024*1024
+#define BUF_SIZE_MAX 1024*1024*1024
 #define buf__hdr(b)       ((BufHdr *)((char *)b - offsetof(BufHdr, buf)))
 #define buf__fits(b, x)   (buf__len(b) + (x) <= buf__cap(b))
 #define buf__fit(b, x)    (buf__fits(b, x) ? 0 : *(void **)&(b) = buf__grow(b, buf__len(b) + (x), sizeof(*(b))))
@@ -147,6 +147,16 @@ void syntax_error(const char* fmt, ...){
 size_t test_ok_lvl = 0;
 #define TEST_OK printf("TEST %zu: OK AT %s\n", ++test_ok_lvl, __FUNCTION__);
 #define STR_CMP(a, b) (strcmp((a), (b)) == 0)
+
+// table is a std::vector
+#define  LOOK_UP_TABLE(table, field, param, else_ret)	\
+  for(size_t i=0; i < (table).size(); ++i){		\
+    if(!strcmp((table)[i]->field, param)){		\
+      return (table)[i];				\
+    }							\
+  }							\
+  return else_ret;
+
 #endif /* __util */
 
 

@@ -1,0 +1,4 @@
+import "std/std.gfsl"
+proc main{
+  "sex\n" puts
+}

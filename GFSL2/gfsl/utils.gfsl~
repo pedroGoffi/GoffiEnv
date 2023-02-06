@@ -1,9 +1,0 @@
-import "std/std.gfsl"
-proc usage
-// int -- FILE* 
-{
-  local fd 8 end
-  // int ptr
-  fd swap store
-  
-}

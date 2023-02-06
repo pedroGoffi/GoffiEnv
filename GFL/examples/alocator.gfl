@@ -1,0 +1,5 @@
+estrutura BufHdr {
+  var len: i64;
+  var cap: i64;
+  var buf: char[0];
+}

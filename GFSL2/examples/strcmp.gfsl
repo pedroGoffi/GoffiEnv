@@ -1,0 +1,16 @@
+import "std/std.gfsl"
+import "std/string.gfsl"
+
+proc strcmp ptr ptr: bool {
+       str-data load
+  swap str-data load
+  streq return
+}
+proc main{
+  local A 16 end A "hello, world!" str!
+  local B 16 end B "hello, world!" str!
+  if A B strcmp do
+    "A == B\n" puts
+  end
+
+}

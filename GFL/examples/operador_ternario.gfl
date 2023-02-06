@@ -2,7 +2,7 @@
 // expressao em c;   (expressao)? caso verdadeiro : caso falso
 // expressao em gfl; caso verdadeiro se expressao senao caso falso
 
-algoritmo main() {
+func main() {
   __print__(
     1 se 0 senao 0, // esperado 0
     1 se 1 senao 0  // esperado 1    

@@ -1,14 +1,34 @@
-#incluir "std/padrao.gfl"
 
-
-algoritmo main(argc: i64, argv: **char)
-{    
-  enquanto argc 
+func strlen(str: *char): i64{
+  var len: i64 = 0;
+  enquanto (str[len += 1]){}
+  retorne len;
+}
+func streq(a: *char, b: *char): i64
+{
+  var i: i64 = 0;
+  se strlen(a) != strlen(b)
+  { retorne 0; }
+  
+  enquanto a[i]
   {
-    puts("'");
-    puts(argv[argc - 1]);
-    puts("'"); 
-    puts((" -- " se argc != 1 senao "\n") como *char);
-    argc -= 1;
+    __print__(a[i], b[i]);
+    se a[i] != b[i]
+    { retorne 0; }
+    i += 1;
+  }
+  retorne 1;
+}
+func main(argc: i64, argv: **char)
+{
+  var str1: *char = "ha";
+
+  __print__(str1[0]);
+  se streq("sex", "sexa"){
+    __print__(2);
+  }
+  senao
+  {
+      __print__(0);
   }
 }
