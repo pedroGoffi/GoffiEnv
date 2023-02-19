@@ -1,0 +1,15 @@
+digraph G {
+	{"code string"}
+	  -> "lexer"
+	  -> "parser"
+	  -> {"code_string arg"}
+	  -> "visitor"
+	  -> {
+	    // at this point we're emulating the code
+	    "code table",
+	    "local context",
+	    "built-in procedures",
+	    "casting"
+	  }
+	  
+}

@@ -1,0 +1,4 @@
+vx = 10
+main :: proc() {
+  write("the var_x is = (", str(vx), ")\n")
+}

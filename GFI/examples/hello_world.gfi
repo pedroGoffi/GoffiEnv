@@ -1,3 +1,5 @@
 main :: proc (){
-  write("Hello, world!\n\n")
+  write("hello, world!\n")
 }
+
+

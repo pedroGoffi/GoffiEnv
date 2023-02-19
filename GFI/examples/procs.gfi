@@ -1,0 +1,7 @@
+x: string = "hello, world!"
+
+main :: proc()
+{
+  write(x, "\n")
+}
+

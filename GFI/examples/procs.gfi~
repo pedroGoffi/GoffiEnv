@@ -1,0 +1,15 @@
+x: string = "hello, world!"
+// ideais para Types
+// string :: type {
+//   type_name = "string"
+//   __on_asign__ :: proc(nd) expect_nd(NODE_STRING)
+// }
+// int :: type {
+//   names + procs only
+//   type_name: string = "int"
+//   some_stuff :: proc() = return do_stuff() 
+// }
+main :: proc()
+{
+  write(x, "\n")
+}

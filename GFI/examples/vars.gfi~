@@ -1,0 +1,6 @@
+var_x = 10
+
+main :: proc() {
+  write("the var_x is = (", str(var_x), ")\n")
+  fib()
+}

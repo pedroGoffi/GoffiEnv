@@ -1,5 +1,4 @@
 #include "./src/gfi.cpp"
-
 int main(int argc, char** argv)
 {
   int exit_val = gfi_main(argc, argv);
